@@ -20,6 +20,10 @@
   --term-bg:   #16202a;
   --term-ink:  #ccd8e2;
   --term-dim:  #7d8d9c;
+  --host-bg:   #dbe3ec;
+  --host-ink:  #2b3c4d;
+  --ctr-bg:    #c4e5e1;
+  --ctr-ink:   #08423f;
 
   --step:  clamp(1.05rem, 0.9rem + 0.5vw, 1.2rem);
   --h1:    clamp(2rem, 1.4rem + 2.4vw, 3.1rem);
@@ -45,6 +49,10 @@
     --term-bg:   #070c11;
     --term-ink:  #c6d3de;
     --term-dim:  #6c7d8c;
+    --host-bg:   #263443;
+    --host-ink:  #accbe4;
+    --ctr-bg:    #0e423f;
+    --ctr-ink:   #72d8d1;
   }
 }
 
@@ -64,6 +72,10 @@
   --term-bg:   #070c11;
   --term-ink:  #c6d3de;
   --term-dim:  #6c7d8c;
+  --host-bg:   #263443;
+  --host-ink:  #accbe4;
+  --ctr-bg:    #0e423f;
+  --ctr-ink:   #72d8d1;
 }
 
 * { box-sizing: border-box; }
@@ -177,6 +189,25 @@ code {
   color: var(--term-dim);
 }
 .term-bar b { font-weight: 500; color: var(--term-ink); }
+
+/* 位置標示：每一步都要一眼看出人在主機還是容器裡 */
+.where {
+  display: inline-block;
+  font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.12rem 0.5rem; border-radius: 2px;
+  margin-right: 0.5rem; vertical-align: 0.12em;
+}
+.where.host { background: var(--host-bg); color: var(--host-ink); }
+.where.ctr  { background: var(--ctr-bg);  color: var(--ctr-ink); }
+.term.host .term-bar { background: var(--host-bg); color: var(--host-ink); border-bottom-color: var(--host-bg); }
+.term.ctr  .term-bar { background: var(--ctr-bg);  color: var(--ctr-ink);  border-bottom-color: var(--ctr-bg); }
+.term.host .term-bar b, .term.ctr .term-bar b { color: inherit; }
+
+/* 「你應該看到」的說明列 */
+.expect { font-size: 0.88rem; color: var(--ink-soft); display: flex; gap: 0.5rem; }
+.expect::before { content: "→"; color: var(--accent); font-weight: 700; }
 .term pre {
   margin: 0; padding: 0.9rem 1rem;
   overflow-x: auto;
@@ -292,30 +323,31 @@ footer {
 
   <ol class="steps">
     <li class="step"><div class="step-body">
-      <h3>確認 git 版本 ≥ 2.48</h3>
+      <h3><span class="where host">主機</span>確認 git 版本 ≥ 2.48</h3>
       <p class="note">worktree 的相對路徑需要這個版本，否則主機端無法操作容器建出來的 worktree。</p>
-      <div class="term">
-        <div class="term-bar"><b>主機</b> · zsh</div>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
 <pre><span class="cmd">brew install git &amp;&amp; git --version</span>
 <span class="out">git version 2.50.1 (Apple Git-155)</span></pre>
       </div>
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>把 kit 複製到你的專案</h3>
+      <h3><span class="where host">主機</span>把 kit 複製到你的專案</h3>
       <p class="note">kit <strong>不會碰</strong>你專案根目錄的 <code>AGENTS.md</code>——沙箱規則放在
       <code>.devcontainer/sandbox-rules.md</code>。接著依 <a href="../README.md">README</a>
       調整 <code>devcontainer.json</code> 裡標了「專案自訂」的幾個地方。</p>
-      <div class="term">
-        <div class="term-bar"><b>主機</b> · 你的專案根目錄</div>
-<pre><span class="cmd">KIT=/path/to/agent-sandbox-kit</span>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
+<pre><span class="cmd">cd ~/Project/&lt;project&gt;</span>
+<span class="cmd">KIT=~/Project/agent-sandbox-kit</span>
 <span class="cmd">cp -r $KIT/.devcontainer $KIT/scripts $KIT/prompts .</span>
 <span class="cmd">chmod +x scripts/* .devcontainer/*.sh</span></pre>
       </div>
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>決定 skills 從哪裡來</h3>
+      <h3><span class="where host">主機</span>決定 skills 從哪裡來</h3>
       <p class="note">
         <strong>建議用專案自己的一份</strong>——每個專案可以有不同的 skills，例如魔改過的
         superpowers。`devcontainer.json` 裡有兩條註解掉的 mount，二選一打開。
@@ -333,8 +365,8 @@ footer {
       </div>
 
       <p class="note"><strong>(b) 機器共用的</strong>（所有專案同一份）：</p>
-      <div class="term">
-        <div class="term-bar"><b>主機</b> · 先建立來源</div>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
 <pre><span class="cmd">mkdir -p ~/.agent-skills</span>
 <span class="cmd">ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0 \
         ~/.agent-skills/superpowers</span></pre>
@@ -351,7 +383,7 @@ footer {
         <code>&lt;skill-name&gt;/SKILL.md</code>）則逐個 symlink 到兩個 agent 的探索路徑。
       </p>
       <div class="term">
-        <div class="term-bar"><b>容器</b> · 起容器時的輸出與接線結果</div>
+        <div class="term-bar">容器內 · 起容器時的輸出與接線結果</div>
 <pre><span class="out">[post-create] skills：接上 2 個（來源 /opt/agent-skills）</span>
 
 <span class="cmd">ls -l ~/.agents/skills/</span>          <span class="cm"># Codex 的探索路徑</span>
@@ -371,7 +403,7 @@ footer {
           <code>prompt.txt</code> 與 <code>run.sh</code>。整個目錄掛唯讀的話這些都會失敗。
         </p>
         <div class="term">
-          <div class="term-bar"><b>容器</b> · 實測</div>
+          <div class="term-bar">容器內 · 實測</div>
 <pre><span class="cmd">echo x &gt;&gt; .agent/skills/my-tdd/SKILL.md</span>
 <span class="bad">bash: .agent/skills/my-tdd/SKILL.md: Read-only file system</span>
 
@@ -393,48 +425,93 @@ footer {
 <section>
   <h2>每次要用</h2>
 
+  <p class="note">
+    每一步都標了<strong>在哪裡執行</strong>：
+    <span class="where host">主機</span>是你的 Mac，
+    <span class="where ctr">容器</span>是沙箱裡面。指令都含 <code>cd</code>，
+    可以直接複製貼上，不必管上一步停在哪。
+  </p>
+
   <ol class="steps">
+
     <li class="step"><div class="step-body">
-      <h3>起容器</h3>
-      <p class="note">第一次會 build（apt、Node、兩個 agent，約數分鐘），之後幾秒就好。<code>--config</code> 可以省略，CLI 會自己找 <code>.devcontainer/devcontainer.json</code>。</p>
+      <h3><span class="where host">主機</span>起容器</h3>
+      <p class="note">
+        背景先跑起來。第一次要 build（裝 apt 套件、Node、兩個 agent，數分鐘），
+        之後每次只要幾秒。容器會一直在背景執行直到你手動停掉。
+      </p>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
+<pre><span class="cmd">cd ~/Project/&lt;project&gt;</span>
+<span class="cmd">npx @devcontainers/cli up --workspace-folder .</span></pre>
+      </div>
+      <p class="expect">看到最後這兩行代表成功。防火牆那行沒出現就是沒起來，不要繼續。</p>
       <div class="term">
-        <div class="term-bar"><b>主機</b> · 專案根目錄</div>
-<pre><span class="cmd">npx @devcontainers/cli up --workspace-folder .</span>
-<span class="out">[post-create] 完成。cc = Claude、cx = Codex、agent-wt new &lt;name&gt; 開平行 agent。</span>
-<span class="out">Removing user vscode from group sudo</span>
-<span class="out">Running the postStartCommand from devcontainer.json...</span>
-<span class="out">[firewall] fetching GitHub meta</span>
-<span class="ok">[firewall] OK：出站已限制在白名單內（12 個網域 + GitHub IP 段）</span>
-<span class="out">{"outcome":"success","remoteUser":"vscode",</span>
-<span class="out"> "remoteWorkspaceFolder":"/workspaces/&lt;project&gt;"}</span></pre>
+        <div class="term-bar">輸出（節錄）</div>
+<pre><span class="ok">[firewall] OK：出站已限制在白名單內（19 個網域 + GitHub IP 段）</span>
+<span class="out">{"outcome":"success", ... "remoteWorkspaceFolder":"/workspaces/&lt;project&gt;"}</span></pre>
       </div>
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>進容器</h3>
-      <div class="term">
-        <div class="term-bar"><b>主機</b> · 專案根目錄</div>
-<pre><span class="cmd">npx @devcontainers/cli exec --workspace-folder . bash</span></pre>
+      <h3><span class="where host">主機</span>進到容器裡</h3>
+      <p class="note">
+        這行會把你丟進容器的 shell。<strong>從這裡開始，你打的每個指令都在容器內執行。</strong>
+        要離開就打 <code>exit</code>（容器不會停，下次再 <code>exec</code> 進來就好）。
+      </p>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
+<pre><span class="cmd">cd ~/Project/&lt;project&gt;</span>
+<span class="cmd">npx @devcontainers/cli exec --workspace-folder . bash</span></pre>
+      </div>
+      <p class="expect">提示字元變成 <code>vscode ➜ /workspaces/&lt;project&gt; $</code>，代表你在容器裡了。</p>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3><span class="where ctr">容器</span>登入 Claude 和 Codex</h3>
+      <p class="note">
+        <strong>什麼時候要做：</strong>第一次進這個容器時，以及每次 rebuild container 之後。
+        平常停掉再開<strong>不用</strong>重登。
+      </p>
+      <p class="note">
+        <strong>為什麼：</strong>容器裡的 Claude 和 Codex 是全新安裝的，沒有你主機上的登入狀態
+        （主機的憑證刻意不掛進來——那正是沙箱要隔離的東西）。登入後 token 會存在一個
+        named volume 裡，所以容器重啟還在。
+      </p>
+      <div class="term ctr">
+        <div class="term-bar">容器內</div>
+<pre><span class="cmd">claude</span>
+<span class="out">Browser didn't open? Use the url below to sign in:</span>
+<span class="out">https://claude.ai/oauth/authorize?...</span>
+<span class="cm"># 複製那個網址，在你 Mac 的瀏覽器打開、按授權</span>
+<span class="cm"># 授權完會自動回到終端機。登入成功後打 /exit 離開，回到 shell</span>
+
+<span class="cmd">codex login</span>
+<span class="cm"># 同樣的流程</span></pre>
+      </div>
+      <div class="callout">
+        <h3>瀏覽器授權完，終端機卻沒反應？</h3>
+        <p>
+          授權後瀏覽器會停在一個顯示<strong>一串代碼</strong>的頁面。把那串代碼複製、
+          貼回終端機的提示處按 Enter 就完成了。這是因為容器的 port forwarding 沒把
+          localhost 的回呼接回來，不是登入失敗。
+        </p>
       </div>
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>第一次要登入兩個 agent</h3>
-      <p class="note">登入狀態存在 named volume，只有 rebuild 才需要重登。瀏覽器回調失敗時，把畫面上的代碼貼回終端機。</p>
-      <div class="term">
-        <div class="term-bar"><b>容器</b> · vscode@/workspaces/&lt;project&gt;</div>
-<pre><span class="cmd">claude</span>       <span class="cm"># 依提示登入後離開</span>
-<span class="cmd">codex login</span></pre>
+      <h3><span class="where ctr">容器</span>確認沙箱真的關緊了</h3>
+      <p class="note">
+        <strong>每次進容器都要跑</strong>，不是只跑第一次——單檔唯讀 mount 會靜默脫鉤
+        （見下方「已知的洞」）。<strong>全 PASS 才繼續</strong>；有 FAIL 就照那一節的指令重建容器。
+      </p>
+      <div class="term ctr">
+        <div class="term-bar">容器內</div>
+<pre><span class="cmd">verify-sandbox</span></pre>
       </div>
-    </div></li>
-
-    <li class="step"><div class="step-body">
-      <h3>驗證邊界 — 每次都要跑</h3>
-      <p class="note">單檔唯讀 mount 會靜默脫鉤（見下方警告），所以這不是只跑第一次的儀式。全 PASS 才往下做。</p>
       <div class="term">
-        <div class="term-bar"><b>容器</b> · verify-sandbox</div>
-<pre><span class="cmd">verify-sandbox</span>
-<span class="out">== agent sandbox 驗證 ==</span>
+        <div class="term-bar">輸出</div>
+<pre><span class="out">== agent sandbox 驗證 ==</span>
 <span class="out">-- 防火牆 --</span>
 <span class="ok">  PASS</span><span class="out">  防火牆已就緒（/run/firewall-ok）</span>
 <span class="ok">  PASS</span><span class="out">  白名單外的站台連不到（example.com）</span>
@@ -467,29 +544,61 @@ footer {
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>啟動 agent</h3>
-      <p class="note"><code>cc</code> 與 <code>cx</code> 是 image 內的執行檔，會在防火牆未就緒時拒絕啟動。</p>
+      <h3><span class="where ctr">容器</span>啟動 agent</h3>
+      <p class="note">
+        在容器的終端機打 <code>cc</code> 就會開起 Claude，<code>cx</code> 開 Codex。
+        之後就是平常用 agent 的樣子，差別只在它跑在沙箱裡、不會問你授權。
+      </p>
+      <div class="term ctr">
+        <div class="term-bar">容器內</div>
+<pre><span class="cmd">cd /workspaces/&lt;project&gt;</span>
+<span class="cmd">cc</span>          <span class="cm"># 開 Claude</span>
+<span class="cm"># 或</span>
+<span class="cmd">cx</span>          <span class="cm"># 開 Codex</span></pre>
+      </div>
+      <p class="note">
+        <strong>為什麼不直接打 <code>claude</code>：</strong><code>cc</code> 是一層薄包裝，
+        幫你補上三樣東西——bypass 旗標、skills 的載入路徑、把沙箱規則注入系統提示。
+        直接打 <code>claude</code> 這些都不會有，它還是會一直問你授權。
+      </p>
+      <p class="note">
+        它們也會先檢查防火牆。萬一防火牆沒起來，<code>cc</code> 會拒絕啟動而不是讓 agent
+        在沒有網路限制的狀態下全權限執行：
+      </p>
       <div class="term">
-        <div class="term-bar"><b>容器</b></div>
-<pre><span class="cmd">cc</span>    <span class="cm"># Claude（bypass + superpowers + 沙箱規則注入系統提示）</span>
-<span class="cmd">cx</span>    <span class="cm"># Codex（danger-full-access）</span></pre>
+        <div class="term-bar">防火牆未就緒時</div>
+<pre><span class="bad">防火牆未就緒，拒絕啟動 agent。</span></pre>
       </div>
     </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3><span class="where host">主機</span>用完之後</h3>
+      <p class="note">
+        容器不會自己停。要停掉的話回主機下這行；下次再 <code>up</code> 就好，不用重 build。
+      </p>
+      <div class="term host">
+        <div class="term-bar">主機的終端機</div>
+<pre><span class="cmd">cd ~/Project/&lt;project&gt;</span>
+<span class="cmd">docker stop $(docker ps -q --filter label=devcontainer.local_folder=$PWD)</span></pre>
+      </div>
+    </div></li>
+
   </ol>
 </section>
 
 <!-- ============ 平行 ============ -->
 <section>
-  <h2>平行開多個 agent</h2>
+  <h2><span class="where ctr">容器</span>平行開多個 agent</h2>
 
   <p>
     沒有 worktree 的話，agent 和你共用同一個 checkout——它一切分支，你編輯器裡的檔案就整批被換掉。
     <code>agent-wt new</code> 一次處理四件事：建 worktree 與分支、裝依賴、配一個不重複的 PORT、在 tmux 開視窗。
   </p>
 
-  <div class="term">
-    <div class="term-bar"><b>容器</b> · agent-wt</div>
-<pre><span class="cmd">agent-wt new feat-a claude "把動作總覽的欄位改成三欄"</span>
+  <div class="term ctr">
+    <div class="term-bar">容器內</div>
+<pre><span class="cmd">cd /workspaces/&lt;project&gt;</span>
+<span class="cmd">agent-wt new feat-a claude "把動作總覽的欄位改成三欄"</span>
 <span class="out">added 162 packages in 3s</span>
 <span class="out">agent-wt: worktree=/workspaces/&lt;project&gt;/.worktrees/feat-a 分支=agent/feat-a PORT=3120</span>
 <span class="out">agent-wt: [claude] 已在 tmux agents:feat-a 啟動 → tmux attach -t agents</span>
@@ -509,13 +618,18 @@ footer {
 
 <!-- ============ 收成 ============ -->
 <section>
-  <h2>收成（主機或容器都可以）</h2>
+  <h2><span class="where host">主機</span>收成</h2>
 
   <p class="note">沒有 <code>agent-wt diff</code> 或 <code>agent-wt rm</code>——那些本來就各是一行原生 git，包起來不會更短。</p>
 
-  <div class="term">
-    <div class="term-bar"><b>主機</b> · 路徑前綴和容器不同，但相對連結兩邊都通</div>
-<pre><span class="cmd">git worktree list</span>
+  <p class="note">
+    在容器裡也做得到，但通常你會在主機上 review 和 merge——因為 worktree 用的是相對路徑，
+    兩邊都操作得到（路徑前綴不同也沒關係）。
+  </p>
+  <div class="term host">
+    <div class="term-bar">主機的終端機</div>
+<pre><span class="cmd">cd ~/Project/&lt;project&gt;</span>
+<span class="cmd">git worktree list</span>
 <span class="out">~/Project/&lt;project&gt;                  a908449 [main]</span>
 <span class="out">~/Project/&lt;project&gt;/.worktrees/feat-a a908449 [agent/feat-a]</span>
 
@@ -569,7 +683,7 @@ footer {
       在主機上編輯過就會脫鉤。開發這份設定時實測到，一次就中：
     </p>
     <div class="term">
-      <div class="term-bar"><b>容器</b> · 主機剛編輯過某個單檔 mount 的來源之後</div>
+      <div class="term-bar">容器內 · 主機剛編輯過某個單檔 mount 的來源之後</div>
 <pre><span class="cmd">verify-sandbox</span>
 <span class="bad">  FAIL</span><span class="out">  .mcp.json 不可寫  → &lt;rc=0&gt;</span>
 <span class="bad">PASS=17 FAIL=1</span>
@@ -577,7 +691,7 @@ footer {
     </div>
     <p>修法是重建容器：</p>
     <div class="term">
-      <div class="term-bar"><b>主機</b></div>
+      <div class="term-bar">主機的終端機</div>
 <pre><span class="cmd">docker rm -f $(docker ps -aq --filter label=devcontainer.local_folder=$PWD)</span>
 <span class="cmd">npx @devcontainers/cli up --workspace-folder .</span>
 <span class="ok">PASS=18 FAIL=0</span></pre>
@@ -669,7 +783,7 @@ footer {
   </p>
 
   <div class="term">
-    <div class="term-bar"><b>容器</b> · npm test</div>
+    <div class="term-bar">容器內 · npm test</div>
 <pre><span class="bad">Cannot find module '@rolldown/binding-linux-arm64-gnu'</span>
 <span class="out">Require stack:</span>
 <span class="out">- /workspaces/&lt;project&gt;/node_modules/rolldown/dist/shared/binding-….mjs</span></pre>
