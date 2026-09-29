@@ -1,0 +1,93 @@
+// Claude + Codex 的 agent 沙箱：同一個容器，共用 superpowers、AGENTS.md、
+// 防火牆、worktree。容器就是隔離邊界，所以兩個 agent 都以全權限執行。
+//
+// 標了「專案自訂」的地方是你要依專案調整的，其餘照用即可。完整說明見 README.md
+{
+  "name": "agents",   // 專案自訂：改成你的專案名稱
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "args": {
+      "INSTALL_CLAUDE": "true",
+      "INSTALL_CODEX": "true"
+    }
+  },
+  "remoteUser": "vscode",
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
+  "features": {
+    // 依專案打開需要的語言環境。
+    // features 以 root 執行且疊在 Dockerfile 之上，會把 sudo 權限寫回來，
+    // 所以 sudo 收斂放在 post-create.sh 的最後一步（features 跑完之後）。
+    // 絕對不要加 docker-outside-of-docker：掛主機 docker.sock 等於把沙箱打穿。
+    // "ghcr.io/devcontainers/features/java:1": { "version": "21", "installMaven": "true", "installGradle": "true" },
+    // "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.agent-skills/superpowers,target=/opt/superpowers,type=bind,readonly",
+
+    // ── 控制面檔案唯讀：這些檔案「由主機端工具執行」或「定義沙箱本身」。
+    //    可寫的話 agent 就能改掉邊界，或留下你在主機上觸發時才執行的東西。
+    //    .git 其餘部分（refs / objects / worktrees）維持可寫，commit 與 worktree add 照常。
+    "source=${localWorkspaceFolder}/.devcontainer,target=${containerWorkspaceFolder}/.devcontainer,type=bind,readonly",
+    //    只掛目錄，不掛單一檔案。單檔 mount 會因為 git 的 lock+rename（換 inode）
+    //    靜默脫鉤、檔案變回可寫；目錄 mount 不會。.git/config 因此不掛，
+    //    改由 verify-sandbox 檢查 core.hooksPath 有沒有被動過。
+    "source=${localWorkspaceFolder}/.git/hooks,target=${containerWorkspaceFolder}/.git/hooks,type=bind,readonly",
+    //    刻意沒有 CLAUDE.md：它在主機上也會被 Claude Code 讀到，而 AGENTS.md 講的是
+    //    「你在容器內、權限全開」——在主機上讀到會是錯的。容器內改由 cc() 與
+    //    agent-wt 以 --append-system-prompt 注入。
+    "source=${localWorkspaceFolder}/AGENTS.md,target=${containerWorkspaceFolder}/AGENTS.md,type=bind,readonly",
+
+    //    專案自訂：以下兩個也是控制面，但**來源不存在會讓容器啟動失敗**，
+    //    所以預設註解。確認專案根目錄真的有這些檔案再打開。
+    // "source=${localWorkspaceFolder}/.mcp.json,target=${containerWorkspaceFolder}/.mcp.json,type=bind,readonly",
+    // "source=${localWorkspaceFolder}/.claude,target=${containerWorkspaceFolder}/.claude,type=bind,readonly",
+
+    // 專案自訂：依賴目錄建議用 named volume，讓容器有自己的一份。
+    // 原因：主機若是 macOS，裝出來的原生 binary 是 darwin-arm64，
+    // 掛進 Linux 容器會找不到 binding。由 project-setup.sh 負責填充。
+    // Node 專案：
+    // "source=node-modules-${devcontainerId},target=${containerWorkspaceFolder}/node_modules,type=volume",
+    // Python 專案：
+    // "source=venv-${devcontainerId},target=${containerWorkspaceFolder}/.venv,type=volume",
+    "source=claude-home-${devcontainerId},target=/home/vscode/.claude,type=volume",
+    "source=codex-home-${devcontainerId},target=/home/vscode/.codex,type=volume"
+  ],
+  "containerEnv": {
+    "GIT_USER_NAME": "agent",
+    "GIT_USER_EMAIL": "agent@localhost",
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    "DISABLE_AUTOUPDATER": "1",
+    "CODEX_HOME": "/home/vscode/.codex"
+  },
+  "remoteEnv": {
+    "PATH": "${containerWorkspaceFolder}/scripts:${containerEnv:PATH}",
+    // 指向唯讀掛載的根目錄副本。agent 跑在 .worktrees/<name>/ 裡，
+    // 那裡的 AGENTS.md 是可寫的 checkout，不能拿它當規則來源。
+    "AGENT_RULES": "${containerWorkspaceFolder}/AGENTS.md",
+    "VSCODE_IPC_HOOK_CLI": "",
+    "GIT_ASKPASS": "",
+    "BROWSER": "",
+    "SSH_AUTH_SOCK": "",
+    "GPG_AGENT_INFO": ""
+  },
+  // 專案自訂：要從主機看畫面的 port。平行 agent 各自用 .agent.env 裡的 PORT。
+  // "forwardPorts": [5173],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "sudo /usr/local/share/init-firewall.sh",
+  // 防火牆跑完才把終端機交出來。沒有這行的話，工具可能在 postStart 還在跑時
+  // 就讓你進去，於是有一小段「容器已開、防火牆未就緒」的空窗。
+  // 這是第二層——第一層是 /run/firewall-ok 旗標 + shell 守衛擋 cc / cx。
+  "waitFor": "postStartCommand",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "openai.chatgpt"
+      ]
+    }
+  }
+}

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# 複製成 .devcontainer/project-setup.sh 並 chmod +x。
+# 由 post-create.sh 在「收斂 sudo 之前」執行一次——這是唯一還能用 sudo 的時機。
+set -euo pipefail
+
+# 掛在 workspace 底下的 named volume 預設 root 擁有，要先交還
+# sudo chown "$(id -u):$(id -g)" node_modules
+
+# 裝依賴
+# npm ci --no-audit --no-fund
+# uv sync
+# ./gradlew --no-daemon dependencies

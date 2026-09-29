@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# 複製到專案根目錄成 .worktree-setup.sh 並 chmod +x。
+# agent-wt 建立新 worktree 後，在那個 worktree 裡執行一次。
+# 每個 worktree 是獨立的 checkout，通常要自己裝一份依賴。
+set -euo pipefail
+
+# npm ci --no-audit --no-fund

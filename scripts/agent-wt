@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# agent-wt new <name> [claude|codex] [prompt|@file]
+#
+#   建 worktree（分支 agent/<name>）→ 裝依賴 → 配一個不重複的 PORT → 在 tmux 開一個視窗。
+#   為什麼要 worktree：沒有的話 agent 和你共用同一個 checkout，它一切分支你編輯器裡的
+#   檔案就整批被換掉。
+#
+# 只有 new。列出 / 看 diff / 移除都用原生 git，本來就各是一行：
+#   git worktree list
+#   git diff main...agent/<name>
+#   git worktree remove .worktrees/<name> && git branch -d agent/<name>
+set -euo pipefail
+
+[ "${1:-}" = new ] || { sed -n '2,12p' "$0"; exit 1; }
+name="${2:?用法: agent-wt new <name> [claude|codex] [prompt|@file]}"
+agent="${3:-claude}"
+prompt="${4:-}"
+
+[[ "$name" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "name 只能用英數與 . _ -" >&2; exit 1; }
+case "$agent" in claude) cmd=cc ;; codex) cmd=cx ;; *) echo "agent 只能是 claude 或 codex" >&2; exit 1 ;; esac
+
+# 不論在主目錄或某個 worktree 裡執行，都找回主 repo
+ROOT="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+path="$ROOT/.worktrees/$name"
+[ -e "$path" ] && { echo "$path 已存在" >&2; exit 1; }
+
+# @file 形式的 prompt
+if [ "${prompt:0:1}" = "@" ]; then
+  f="${prompt:1}"; [ -f "$f" ] || f="$ROOT/${prompt:1}"
+  [ -f "$f" ] || { echo "找不到 prompt 檔：${prompt:1}" >&2; exit 1; }
+  prompt="$(cat "$f")"
+fi
+
+# 用 .git/info/exclude 而不是 .gitignore，不污染版控
+ex="$ROOT/.git/info/exclude"; mkdir -p "$(dirname "$ex")"; touch "$ex"
+for p in ".worktrees/" ".agent/"; do grep -qxF "$p" "$ex" || echo "$p" >> "$ex"; done
+
+# 偵測 --relative-paths。這裡有兩個踩過的坑，改動前先讀完：
+#   1. 別 grep 字面上的 "--relative-paths"。help 印的是 "--[no-]relative-paths"，
+#      那個子字串在任何 git 版本都不存在。
+#   2. 別用 pipeline。本檔開頭是 set -o pipefail，而 `git worktree add -h` 的離開碼
+#      是 129（usage），pipefail 會讓整條 pipeline 回傳非零，條件因此永遠成立。
+# 兩個任一個成立就會靜默 fallback 成絕對路徑，主機端便無法操作這個 worktree。
+rel="--relative-paths"
+case "$(git worktree add -h 2>&1 || true)" in
+  *relative-paths*) ;;
+  *) echo "agent-wt: WARN git < 2.48，改用絕對路徑（主機端將無法操作此 worktree）" >&2
+     rel="" ;;
+esac
+
+# worktree add 失敗時分支仍會被建出來，留著會讓同名重試撞 "already exists"
+if ! git -C "$ROOT" worktree add $rel -b "agent/$name" "$path"; then
+  git -C "$ROOT" branch -D "agent/$name" 2>/dev/null || true
+  echo "agent-wt: worktree add 失敗（已清掉分支 agent/$name）" >&2
+  exit 1
+fi
+
+# 依名稱算出固定且不重複的 PORT，避免兩個 dev server 搶同一個
+port=$(( 3100 + ($(printf %s "$name" | cksum | cut -d' ' -f1) % 80) * 10 ))
+printf 'export PORT=%s\nexport COMPOSE_PROJECT_NAME=%s\n' \
+  "$port" "$(basename "$ROOT")-$name" > "$path/.agent.env"
+
+mkdir -p "$path/.agent"
+# 新 worktree 是獨立的 checkout，通常要自己裝一份依賴。
+# 專案自己提供這支 hook（範例見 .worktree-setup.sh.example）。
+if [ -x "$ROOT/.worktree-setup.sh" ]; then
+  echo "agent-wt: 執行 .worktree-setup.sh"
+  ( cd "$path" && "$ROOT/.worktree-setup.sh" )
+fi
+
+# prompt 不走命令列：printf %q 對中文會把每個字展開成多個八進位跳脫，
+# 被 tmux 的命令列再包一層就會撞上 "command too long"。改成寫一支 runner，
+# tmux 只拿到一個路徑，內容在腳本裡才展開。
+[ -n "$prompt" ] && printf '%s' "$prompt" > "$path/.agent/prompt.txt"
+runner="$path/.agent/run.sh"
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -a; . ./.agent.env; set +a'
+  if [ -n "$prompt" ]; then printf '%s "$(cat .agent/prompt.txt)"\n' "$cmd"
+  else printf '%s\n' "$cmd"; fi
+  echo 'exec bash'
+} > "$runner"
+chmod +x "$runner"
+
+tmux new-window -t agents -n "$name" -c "$path" "$runner" 2>/dev/null \
+  || tmux new-session -d -s agents -n "$name" -c "$path" "$runner"
+
+echo "agent-wt: worktree=$path 分支=agent/$name PORT=$port"
+echo "agent-wt: [$agent] 已在 tmux agents:$name 啟動 → tmux attach -t agents"

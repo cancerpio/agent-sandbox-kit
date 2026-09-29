@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# 進容器後跑一次，確認沙箱真的關緊了。
+# 每一項都是「應該失敗 / 應該是空的」，有任何一項 FAIL 就代表邊界有洞。
+echo "== agent sandbox 驗證 =="
+pass=0; fail=0
+chk() { # $1=說明 $2=期望(fail|empty|ok) $3...=指令
+  local desc="$1" want="$2"; shift 2
+  local out rc
+  out="$("$@" 2>&1)"; rc=$?
+  local ok=1
+  case "$want" in
+    fail)  [ $rc -ne 0 ] || ok=0 ;;
+    empty) [ -z "$out" ] || ok=0 ;;
+    ok)    [ $rc -eq 0 ] || ok=0 ;;
+  esac
+  if [ $ok -eq 1 ]; then echo "  PASS  $desc"; pass=$((pass+1))
+  else echo "  FAIL  $desc  → ${out:-<rc=$rc>}"; fail=$((fail+1)); fi
+}
+
+echo "-- 防火牆 --"
+chk "防火牆已就緒（/run/firewall-ok）"        ok    test -f /run/firewall-ok
+chk "白名單外的站台連不到（example.com）"      fail  curl -s --connect-timeout 5 https://example.com
+chk "Anthropic API 連得到"                    ok    curl -s --connect-timeout 8 -o /dev/null https://api.anthropic.com
+chk "npm registry 連得到"                     ok    curl -s --connect-timeout 8 -o /dev/null https://registry.npmjs.org
+
+echo "-- sudo --"
+chk "不能用 sudo 做任意事"                     fail  sudo -n whoami
+chk "不能帶參數執行防火牆腳本"                  fail  sudo -n /usr/local/share/init-firewall.sh /tmp/evil.txt
+
+echo "-- 控制面唯讀 --"
+# 目錄 mount 是穩的；單一檔案的 mount 會因 git 的 lock+rename（換 inode）靜默脫鉤，
+# 所以 AGENTS.md / .mcp.json 這兩項若 FAIL，修法是重建容器（見 docs/agent-sandbox.md）。
+for d in .devcontainer .claude .git/hooks; do
+  [ -d "$d" ] || { echo "  SKIP  $d 不存在"; continue; }
+  chk "$d/ 不可寫"                            fail  bash -c "touch '$d/_probe'"
+  rm -f "$d/_probe" 2>/dev/null || true
+done
+for f in AGENTS.md .mcp.json; do
+  [ -e "$f" ] || { echo "  SKIP  $f 不存在"; continue; }
+  chk "$f 不可寫"                             fail  bash -c "printf '' >> '$f'"
+done
+# .git/config 刻意不用唯讀 mount（單檔不可靠，且會擋掉 worktree add）。
+# 改成直接檢查它有沒有被動過：core.hooksPath 能把 hooks 導向可寫目錄，
+# 繞過上面 .git/hooks 的唯讀保護。
+chk "core.hooksPath 未被設定"                 fail  git config --get core.hooksPath
+
+echo "-- git 仍可正常工作 --"
+chk "git identity 已設定"                     ok    git config --get user.email
+chk "可以寫入 .git/objects（commit 可行）"      ok    bash -c 'git commit-tree -m _probe "$(git write-tree)" >/dev/null'
+
+echo "-- VS Code 逃逸路徑（必須全空）--"
+chk "VSCODE_IPC_HOOK_CLI 為空"                empty printenv VSCODE_IPC_HOOK_CLI
+chk "GIT_ASKPASS 為空"                        empty printenv GIT_ASKPASS
+chk "BROWSER 為空"                            empty printenv BROWSER
+chk "SSH_AUTH_SOCK 為空"                      empty printenv SSH_AUTH_SOCK
+chk "沒有 vscode IPC socket"                  empty bash -c 'ls /tmp/vscode-*.sock 2>/dev/null'
+
+echo "-- 憑證不在容器內 --"
+chk "沒有 ~/.ssh"                             fail  test -d "$HOME/.ssh"
+chk "沒有主機 docker.sock"                     fail  test -S /var/run/docker.sock
+
+echo
+echo "PASS=$pass FAIL=$fail"
+[ $fail -eq 0 ] || { echo "有項目未通過，請先修好再放 agent 進來。"; exit 1; }

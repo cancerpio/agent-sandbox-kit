@@ -1,0 +1,10 @@
+.DS_Store
+
+# 使用者自己的 hook（從 .example 複製出來的）不進 kit 的版控
+.devcontainer/project-setup.sh
+.worktree-setup.sh
+
+# agent-wt 在目標專案產生的東西
+.worktrees/
+.agent.env
+.agent/

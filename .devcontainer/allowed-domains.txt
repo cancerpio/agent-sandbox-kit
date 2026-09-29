@@ -1,0 +1,32 @@
+# 出站白名單：一行一個網域。修改後重啟容器生效。
+#
+# 注意這是 IP 粒度的白名單（啟動時用 dig 解析一次），同一個 IP 上的其他網域
+# （SNI 共用）擋不住。公司內部的 registry / mirror 記得自己加。
+
+# ---- Anthropic / Claude Code ----
+api.anthropic.com
+claude.ai
+platform.claude.com
+console.anthropic.com
+sentry.io
+
+# ---- OpenAI / Codex ----
+api.openai.com
+auth.openai.com
+chatgpt.com
+
+# ---- 套件來源：只留專案真的會用到的，其餘刪掉 ----
+registry.npmjs.org
+registry.yarnpkg.com
+pypi.org
+files.pythonhosted.org
+repo.maven.apache.org
+repo1.maven.org
+plugins.gradle.org
+services.gradle.org
+
+# ---- GitHub 內容 ----
+# github.com 本體的 IP 段由 init-firewall.sh 從 api.github.com/meta 取得，不必列在這裡
+raw.githubusercontent.com
+objects.githubusercontent.com
+codeload.github.com
