@@ -32,12 +32,6 @@ Antigravity、Cursor 等拿不到微軟 Marketplace 的編輯器上也能用。
 
 ```bash
 brew install git        # 需要 >= 2.48（worktree 相對路徑）
-
-# 讓容器讀得到 superpowers skills（沒用 superpowers 就跳過，並刪掉 devcontainer.json
-# 裡對應的那條 mount）
-mkdir -p ~/.agent-skills
-ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/<版本> \
-        ~/.agent-skills/superpowers
 ```
 
 ### 二、複製到目標專案
@@ -60,7 +54,42 @@ chmod +x scripts/* .devcontainer/*.sh
 Codex 的載入順序是官方定義的：先讀 `$CODEX_HOME/AGENTS.md`，再從 git root 往下
 逐層讀，後面的覆蓋前面的。所以沙箱規則當底，你的專案規則蓋在上面。
 
-### 三、依專案調整四個地方
+### 三、決定 skills 從哪裡來
+
+`devcontainer.json` 裡有兩條註解掉的 mount，**二選一打開**（來源不存在會讓容器啟動失敗，
+所以預設都註解）。
+
+**(a) 專案自己的一份（推薦）** — 每個專案可以有不同的 skills，例如魔改過的 superpowers
+放在 `.agent/skills/`：
+
+```jsonc
+"source=${localWorkspaceFolder}/.agent/skills,target=/opt/agent-skills,type=bind,readonly",
+
+// 再把來源路徑本身蓋成唯讀，否則 agent 可以從 workspace 改掉自己的 skills。
+// 刻意只蓋 skills 這一層——.agent/ 其餘部分必須可寫（QUESTIONS.md、agent-wt 的暫存）。
+"source=${localWorkspaceFolder}/.agent/skills,target=${containerWorkspaceFolder}/.agent/skills,type=bind,readonly",
+```
+
+**(b) 機器共用的一份**：
+
+```bash
+mkdir -p ~/.agent-skills
+ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/<版本> \
+        ~/.agent-skills/superpowers
+```
+
+```jsonc
+"source=${localEnv:HOME}/.agent-skills/superpowers,target=/opt/agent-skills,type=bind,readonly",
+```
+
+兩種**目錄結構**都支援，`post-create.sh` 自動判斷：
+
+| 結構 | 判斷依據 | 怎麼接 |
+|---|---|---|
+| plugin 形式 | 底下有 `.claude-plugin/` | Claude 由 `cc` 的 `--plugin-dir` 載入；Codex 讀 `<dir>/skills` |
+| 純 skills 目錄 | 底下直接是 `<skill-name>/SKILL.md` | 逐個 symlink 到 `~/.agents/skills/`（Codex）與 `$CLAUDE_CONFIG_DIR/skills/`（Claude） |
+
+### 四、依專案調整四個地方
 
 `devcontainer.json` 裡標了 `專案自訂` 的註解就是這些：
 
@@ -77,7 +106,7 @@ Codex 的載入順序是官方定義的：先讀 `$CODEX_HOME/AGENTS.md`，再�
 - **`.devcontainer/sandbox-rules.md`** — 通常不用改。裡面只有沙箱環境的規則，
   你的專案規則寫在自己的 `AGENTS.md` 就好
 
-### 四、依賴安裝的 hook
+### 五、依賴安裝的 hook
 
 兩支，都是「存在就執行」，不存在就跳過：
 

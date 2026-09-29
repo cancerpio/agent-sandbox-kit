@@ -34,7 +34,7 @@ COPY <<'EOF' /usr/local/bin/cc
 #!/usr/bin/env bash
 [ -f /run/firewall-ok ] || { echo "防火牆未就緒，拒絕啟動 agent。" >&2; exit 1; }
 args=(--dangerously-skip-permissions)
-[ -d /opt/superpowers/.claude-plugin ] && args+=(--plugin-dir /opt/superpowers)
+[ -d /opt/agent-skills/.claude-plugin ] && args+=(--plugin-dir /opt/agent-skills)
 # 規則來源固定是唯讀掛載的根目錄副本，不是 worktree 裡那份可寫的 checkout
 [ -r "${AGENT_RULES:-}" ] && args+=(--append-system-prompt "$(cat "$AGENT_RULES")")
 exec claude "${args[@]}" "$@"
@@ -47,11 +47,10 @@ exec codex --dangerously-bypass-approvals-and-sandbox "$@"
 EOF
 
 # volume 掛載點先建好並設好擁有者，否則 named volume 會是 root 擁有。
-# ~/.agents/skills 是 Codex 原生的 skill 探索路徑，指向 runtime 才掛上的 /opt/superpowers。
+# skills 的接線在 post-create.sh——要先看掛進來的是 plugin 還是純 skills 目錄。
 RUN chmod 755 /usr/local/share/init-firewall.sh /usr/local/bin/cc /usr/local/bin/cx \
  && chmod 644 /usr/local/share/allowed-domains.txt \
  && mkdir -p /home/vscode/.claude /home/vscode/.codex /home/vscode/.agents/skills \
- && ln -sfn /opt/superpowers/skills /home/vscode/.agents/skills/superpowers \
  && chown -R vscode:vscode /home/vscode/.claude /home/vscode/.codex /home/vscode/.agents
 
 # sudo 收斂刻意不在這裡做：devcontainer features 疊在這個 image 之上、以 root 執行，

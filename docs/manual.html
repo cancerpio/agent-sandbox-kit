@@ -315,15 +315,69 @@ footer {
     </div></li>
 
     <li class="step"><div class="step-body">
-      <h3>把 superpowers skills 接到容器讀得到的位置</h3>
-      <p class="note">容器內以唯讀掛載這個路徑。superpowers 升版後版本號目錄會換，重跑一次 <code>ln -sfn</code> 指到新版即可。</p>
+      <h3>決定 skills 從哪裡來</h3>
+      <p class="note">
+        <strong>建議用專案自己的一份</strong>——每個專案可以有不同的 skills，例如魔改過的
+        superpowers。`devcontainer.json` 裡有兩條註解掉的 mount，二選一打開。
+      </p>
+
+      <p class="note"><strong>(a) 專案自己的</strong>，例如放在 <code>.agent/skills/</code>：</p>
       <div class="term">
-        <div class="term-bar"><b>主機</b> · zsh</div>
+        <div class="term-bar">.devcontainer/devcontainer.json · mounts</div>
+<pre><span class="cm">// 掛給容器讀</span>
+"source=${localWorkspaceFolder}/.agent/skills,target=/opt/agent-skills,type=bind,readonly",
+
+<span class="cm">// 再把來源路徑本身蓋成唯讀，否則 agent 可以從 workspace 改掉自己的 skills。</span>
+<span class="cm">// 刻意只蓋 skills 這一層——.agent/ 其餘部分必須可寫。</span>
+"source=${localWorkspaceFolder}/.agent/skills,target=${containerWorkspaceFolder}/.agent/skills,type=bind,readonly",</pre>
+      </div>
+
+      <p class="note"><strong>(b) 機器共用的</strong>（所有專案同一份）：</p>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · 先建立來源</div>
 <pre><span class="cmd">mkdir -p ~/.agent-skills</span>
 <span class="cmd">ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0 \
-        ~/.agent-skills/superpowers</span>
-<span class="cmd">ls -l ~/.agent-skills/</span>
-<span class="out">superpowers -&gt; /Users/…/superpowers/6.3.0</span></pre>
+        ~/.agent-skills/superpowers</span></pre>
+      </div>
+      <div class="term">
+        <div class="term-bar">.devcontainer/devcontainer.json · mounts</div>
+<pre>"source=${localEnv:HOME}/.agent-skills/superpowers,target=/opt/agent-skills,type=bind,readonly",</pre>
+      </div>
+
+      <p class="note">
+        兩種目錄結構都支援，<code>post-create.sh</code> 會自動判斷：<strong>plugin 形式</strong>
+        （底下有 <code>.claude-plugin/</code>，例如 superpowers 的 fork）交給 <code>cc</code> 的
+        <code>--plugin-dir</code>；<strong>純 skills 目錄</strong>（底下直接是
+        <code>&lt;skill-name&gt;/SKILL.md</code>）則逐個 symlink 到兩個 agent 的探索路徑。
+      </p>
+      <div class="term">
+        <div class="term-bar"><b>容器</b> · 起容器時的輸出與接線結果</div>
+<pre><span class="out">[post-create] skills：接上 2 個（來源 /opt/agent-skills）</span>
+
+<span class="cmd">ls -l ~/.agents/skills/</span>          <span class="cm"># Codex 的探索路徑</span>
+<span class="out">my-review -&gt; /opt/agent-skills/my-review</span>
+<span class="out">my-tdd    -&gt; /opt/agent-skills/my-tdd</span>
+
+<span class="cmd">ls -l $CLAUDE_CONFIG_DIR/skills/</span>  <span class="cm"># Claude 的 user-level skills</span>
+<span class="out">my-review -&gt; /opt/agent-skills/my-review</span>
+<span class="out">my-tdd    -&gt; /opt/agent-skills/my-tdd</span></pre>
+      </div>
+
+      <div class="callout">
+        <h3>為什麼只蓋 <code>.agent/skills</code> 而不是整個 <code>.agent/</code></h3>
+        <p>
+          <code>.agent/</code> 底下還有兩樣<strong>必須可寫</strong>的東西：agent 留給你的
+          <code>.agent/QUESTIONS.md</code>，以及 <code>agent-wt</code> 產生的
+          <code>prompt.txt</code> 與 <code>run.sh</code>。整個目錄掛唯讀的話這些都會失敗。
+        </p>
+        <div class="term">
+          <div class="term-bar"><b>容器</b> · 實測</div>
+<pre><span class="cmd">echo x &gt;&gt; .agent/skills/my-tdd/SKILL.md</span>
+<span class="bad">bash: .agent/skills/my-tdd/SKILL.md: Read-only file system</span>
+
+<span class="cmd">echo "問題" &gt; .agent/QUESTIONS.md</span>
+<span class="ok">✓ 寫得進去</span></pre>
+        </div>
       </div>
     </div></li>
   </ol>
@@ -834,7 +888,7 @@ footer {
       <tr><td><code>.devcontainer/Dockerfile</code></td><td class="num">61</td><td>base image、工具、兩個 agent（版本釘死）、<code>cc</code>／<code>cx</code></td></tr>
       <tr><td><code>.devcontainer/init-firewall.sh</code></td><td class="num">84</td><td>出站白名單，fail-closed</td></tr>
       <tr><td><code>.devcontainer/allowed-domains.txt</code></td><td class="num">32</td><td>白名單網域（在 image 內）</td></tr>
-      <tr><td><code>.devcontainer/post-create.sh</code></td><td class="num">57</td><td>git identity、Codex 設定、<code>npm ci</code>、最後收斂 sudo</td></tr>
+      <tr><td><code>.devcontainer/post-create.sh</code></td><td class="num">82</td><td>git identity、Codex 設定、<code>npm ci</code>、最後收斂 sudo</td></tr>
       <tr><td><code>scripts/agent-wt</code></td><td class="num">89</td><td><code>agent-wt new</code>：worktree ＋ 依賴 ＋ PORT ＋ tmux</td></tr>
       <tr><td><code>scripts/verify-sandbox</code></td><td class="num">66</td><td>邊界檢查。預設安裝跑 18 項，打開選配 mount 後最多 21 項</td></tr>
       <tr><td><code>.devcontainer/sandbox-rules.md</code></td><td class="num">57</td><td>沙箱環境的規則。Claude 由 <code>cc</code> 注入，Codex 由 post-create 放進 <code>$CODEX_HOME</code> 全域層</td></tr>

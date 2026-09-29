@@ -32,6 +32,31 @@ if [ -r "${AGENT_RULES:-}" ]; then
   cp "$AGENT_RULES" "${CODEX_HOME}/AGENTS.md"
 fi
 
+# ---- skills ----
+# /opt/agent-skills 由 devcontainer.json 掛進來（專案自己的，或機器共用的）。
+# 兩種結構都支援：
+#   plugin 形式（底下有 .claude-plugin/，例如 superpowers 的 fork）
+#     → Claude 由 cc 以 --plugin-dir 載入；Codex 讀的是 <dir>/skills
+#   純 skills 目錄（底下直接是 <skill-name>/SKILL.md）
+#     → 兩邊都逐個 symlink 接上
+SKILLS=/opt/agent-skills
+if [ -d "$SKILLS" ]; then
+  if [ -d "$SKILLS/.claude-plugin" ]; then src="$SKILLS/skills"; else src="$SKILLS"; fi
+  mkdir -p "$HOME/.agents/skills" "${CLAUDE_CONFIG_DIR}/skills"
+  n=0
+  for d in "$src"/*/; do
+    [ -f "${d}SKILL.md" ] || continue
+    name=$(basename "$d")
+    ln -sfn "${d%/}" "$HOME/.agents/skills/$name"                       # Codex 原生探索路徑
+    # plugin 形式交給 --plugin-dir，不要再 symlink 一次，否則會載入兩份
+    [ -d "$SKILLS/.claude-plugin" ] || ln -sfn "${d%/}" "${CLAUDE_CONFIG_DIR}/skills/$name"
+    n=$((n+1))
+  done
+  echo "[post-create] skills：接上 $n 個（來源 $src）"
+else
+  echo "[post-create] 未掛載 skills——devcontainer.json 裡那兩條二選一要打開一條。" >&2
+fi
+
 # ---- 專案專屬初始化 ----
 # 裝依賴、chown 掛在 workspace 底下的 named volume 等，都寫在這支 hook 裡。
 # 必須在下面收斂 sudo 之前執行——收斂之後就沒有 chown 的權限了。
