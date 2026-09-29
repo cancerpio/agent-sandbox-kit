@@ -39,10 +39,12 @@
     //    刻意沒有 CLAUDE.md：它在主機上也會被 Claude Code 讀到，而 AGENTS.md 講的是
     //    「你在容器內、權限全開」——在主機上讀到會是錯的。容器內改由 cc() 與
     //    agent-wt 以 --append-system-prompt 注入。
-    "source=${localWorkspaceFolder}/AGENTS.md,target=${containerWorkspaceFolder}/AGENTS.md,type=bind,readonly",
-
-    //    專案自訂：以下兩個也是控制面，但**來源不存在會讓容器啟動失敗**，
+    //    沙箱規則放在 .devcontainer/sandbox-rules.md，已被上面那條目錄 mount 保護，
+    //    所以不需要額外一條。kit 刻意不在專案根目錄放 AGENTS.md——那是你自己的檔案。
+    //
+    //    專案自訂：以下三個也是控制面，但**來源不存在會讓容器啟動失敗**，
     //    所以預設註解。確認專案根目錄真的有這些檔案再打開。
+    // "source=${localWorkspaceFolder}/AGENTS.md,target=${containerWorkspaceFolder}/AGENTS.md,type=bind,readonly",
     // "source=${localWorkspaceFolder}/.mcp.json,target=${containerWorkspaceFolder}/.mcp.json,type=bind,readonly",
     // "source=${localWorkspaceFolder}/.claude,target=${containerWorkspaceFolder}/.claude,type=bind,readonly",
 
@@ -65,9 +67,10 @@
   },
   "remoteEnv": {
     "PATH": "${containerWorkspaceFolder}/scripts:${containerEnv:PATH}",
-    // 指向唯讀掛載的根目錄副本。agent 跑在 .worktrees/<name>/ 裡，
-    // 那裡的 AGENTS.md 是可寫的 checkout，不能拿它當規則來源。
-    "AGENT_RULES": "${containerWorkspaceFolder}/AGENTS.md",
+    // 沙箱規則的來源。放在 .devcontainer/ 底下（已唯讀掛載），而不是專案根目錄的
+    // AGENTS.md——後者是專案自己的檔案，kit 不該蓋掉它，而且在 worktree 裡
+    // 那份是可寫的 checkout，不能拿來當規則來源。
+    "AGENT_RULES": "${containerWorkspaceFolder}/.devcontainer/sandbox-rules.md",
     "VSCODE_IPC_HOOK_CLI": "",
     "GIT_ASKPASS": "",
     "BROWSER": "",

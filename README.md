@@ -17,7 +17,7 @@ Antigravity、Cursor 等拿不到微軟 Marketplace 的編輯器上也能用。
 | 誤碰專案外的檔案（`~/.ssh`、其他 repo） | 擋住 | 容器邊界 |
 | 弄壞開發環境（nvm、全域 CLI） | 擋住 | 容器邊界 |
 | 一直要按授權 | 解決 | 兩個 agent 都 bypass |
-| 改到會在主機執行的檔案 | 擋住 | `.devcontainer/`、`.git/hooks/`、`AGENTS.md` 唯讀 |
+| 改到會在主機執行的檔案 | 擋住 | `.devcontainer/`（含沙箱規則）、`.git/hooks/` 唯讀 |
 | `git push` | 擋住 | 容器內沒有憑證 |
 | agent 自己關掉防火牆 | 擋住 | sudo 收斂成只能跑防火牆腳本且不能帶參數 |
 | VS Code IPC 逃逸（容器內在主機執行指令） | 不存在 | 走 CLI，容器內沒有編輯器 process |
@@ -46,11 +46,19 @@ ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/<版本> \
 cd /path/to/your-project
 KIT=/path/to/agent-sandbox-kit
 cp -r $KIT/.devcontainer $KIT/scripts $KIT/prompts .
-cp $KIT/AGENTS.md .
 chmod +x scripts/* .devcontainer/*.sh
 ```
 
-專案已經有 `AGENTS.md` 的話，把「執行環境」和「自主權」兩節合併進去即可。
+**kit 不會碰你專案根目錄的 `AGENTS.md`。** 沙箱規則放在
+`.devcontainer/sandbox-rules.md`，兩個 agent 各自從不同管道拿到它：
+
+| agent | 怎麼拿到沙箱規則 | 你自己的 `AGENTS.md` |
+|---|---|---|
+| Claude | `cc` 以 `--append-system-prompt` 注入 | 照 Claude Code 原本的規則載入 |
+| Codex | `post-create.sh` 複製到 `$CODEX_HOME/AGENTS.md`（全域層） | 照常讀，而且**優先權更高** |
+
+Codex 的載入順序是官方定義的：先讀 `$CODEX_HOME/AGENTS.md`，再從 git root 往下
+逐層讀，後面的覆蓋前面的。所以沙箱規則當底，你的專案規則蓋在上面。
 
 ### 三、依專案調整四個地方
 
@@ -66,7 +74,8 @@ chmod +x scripts/* .devcontainer/*.sh
 再加上兩處：
 
 - **`.devcontainer/allowed-domains.txt`** — 刪掉專案用不到的套件來源，加上公司內部 registry
-- **`AGENTS.md` 的「這個專案的規則」** — 換成你的（檔案裡有註解提示要寫什麼）
+- **`.devcontainer/sandbox-rules.md`** — 通常不用改。裡面只有沙箱環境的規則，
+  你的專案規則寫在自己的 `AGENTS.md` 就好
 
 ### 四、依賴安裝的 hook
 
@@ -109,7 +118,7 @@ codex login       # 第一次要登入
 
 verify-sandbox    # 每次都跑，全 PASS 才往下做
 
-cc                # 啟動 Claude（bypass + superpowers + AGENTS.md 注入系統提示）
+cc                # 啟動 Claude（bypass + superpowers + 沙箱規則注入系統提示）
 cx                # 啟動 Codex（danger-full-access）
 ```
 
@@ -143,18 +152,19 @@ git push
 
 ### 放 agent 進去之前先 push
 
-專案目錄在容器內可寫（agent 要能改程式碼），`.git` 也在裡面。`AGENTS.md` 禁止它
+專案目錄在容器內可寫（agent 要能改程式碼），`.git` 也在裡面。沙箱規則禁止它
 砍歷史，但那是文字約束不是機制。**沒 push 的 commit 被砍掉就是沒了。**
 
 ---
 
 ## 已知的洞
 
-**單檔唯讀 mount 會靜默脫鉤。** `AGENTS.md`、`.mcp.json` 是單一檔案的 bind mount。
-工具改檔案常用「寫 `.lock` 再 rename」，換的是 inode；主機那側一旦換掉檔案，
-容器裡的 mount 就脫鉤、檔案變回可寫，**沒有任何錯誤訊息**。目錄的 mount 沒這問題。
+**單檔唯讀 mount 會靜默脫鉤。** 工具改檔案常用「寫 `.lock` 再 rename」，換的是 inode；
+主機那側一旦換掉檔案，容器裡的 mount 就脫鉤、檔案變回可寫，**沒有任何錯誤訊息**。
 
-最常觸發的情境很日常：**你在主機上編輯 `AGENTS.md`，它自己的保護就掉了。**
+**目錄的 mount 沒這問題**——這也是沙箱規則放在 `.devcontainer/` 而不是根目錄單檔的
+原因之一。會受影響的是你自己打開的那幾條單檔 mount（`AGENTS.md`、`.mcp.json`）：
+在主機上編輯過就會脫鉤。
 
 所以 `verify-sandbox` 要每次進容器都跑。FAIL 的修法是重建容器：
 
@@ -183,14 +193,15 @@ npx @devcontainers/cli up --workspace-folder .
 | `.devcontainer/post-create.sh` | 48 | git identity、Codex 設定、專案 hook、**最後收斂 sudo** |
 | `scripts/agent-wt` | 89 | `agent-wt new`：worktree ＋ 依賴 ＋ PORT ＋ tmux |
 | `scripts/verify-sandbox` | 64 | 邊界檢查，21 項 |
-| `AGENTS.md` | 80 | agent 的行為規則（容器內唯讀） |
+| `.devcontainer/sandbox-rules.md` | 80 | 沙箱環境的規則。Claude 由 `cc` 注入，Codex 由 post-create 放進全域層 |
 
 ### 三個容易誤解的設計
 
-**沒有 `CLAUDE.md`。** 建了的話主機上的 Claude session 也會載入 `AGENTS.md`，
-而那份講的是「你在容器內、權限全開」——在主機上是錯的。容器內改由 `cc` 以
-`--append-system-prompt` 注入，來源是 `$AGENT_RULES`（唯讀的根目錄副本，
-不是 worktree 裡那份可寫的 checkout）。
+**規則不放在專案根目錄。** 放 `AGENTS.md` 到根目錄有兩個問題：會蓋掉專案自己的那份，
+而且主機上的 session 也會讀到「你在容器內、權限全開」——在主機上是錯的。
+所以規則放 `.devcontainer/sandbox-rules.md`（已被目錄 mount 保護），
+Claude 由 `cc` 以 `--append-system-prompt` 注入，Codex 由 post-create 放進
+`$CODEX_HOME/AGENTS.md`。兩邊都不碰你的檔案。
 
 **`cc` / `cx` 是 image 內的執行檔，不是 shell alias。** `agent-wt` 產生的 runner 是
 非互動 bash，不會 source `/etc/bash.bashrc`，函式放那裡用不到；而且烤進 image 後
@@ -222,7 +233,7 @@ image 之上、以 root 執行，會把 `NOPASSWD:ALL` 寫回來。所以收斂�
 | IPC 環境變數清空 | 走 CLI 本來就沒這條路，這是「萬一改用擴充套件開」的保險 |
 | `verify-sandbox` | 單檔 mount 脫鉤是無聲的，沒有它會以為防護還在 |
 | `agent-wt` | worktree ＋ 依賴 ＋ 不重複的 PORT ＋ tmux 視窗 |
-| `AGENTS.md` | Codex 原生讀這個檔名；Claude 由 `cc` 注入 |
+| 沙箱規則 | 不碰專案的 `AGENTS.md`：Claude 由 `cc` 注入，Codex 走 `$CODEX_HOME` 全域層 |
 | 版本釘死 | 官方是 `latest` ＋ 容器內自動更新；要可重現的 build 就得釘死 |
 
 **官方有而本 kit 刻意不要的**：Reopen in Container 當主要用法（擴充套件會注入 IPC

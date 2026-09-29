@@ -1,15 +1,16 @@
-# Agent 工作規則
+# 沙箱環境規則
 
-> **這份檔案描述的是 devcontainer 容器內的執行環境。**
-> 如果你在**主機**上讀到它（例如直接在 macOS 開 Claude Code 或 Codex），
-> 下面「權限已全開」「已經在 worktree 裡」的敘述**都不適用**——
-> 主機上沒有沙箱邊界，照常套用一般的授權流程。
+> **這份檔案描述的是 devcontainer 容器內的執行環境**，不是專案規則。
+> 專案自己的規則在專案根目錄的 `AGENTS.md`，那份的優先權比這份高。
 
-Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
-（那會讓主機上的 session 也載入這些容器專屬規則），改由容器內的 `cc` 指令與 `agent-wt`
-以 `--append-system-prompt` 注入，來源是唯讀掛載的根目錄副本 `$AGENT_RULES`。
+兩個 agent 各自從不同管道拿到這份規則，**都不會碰到專案根目錄的 `AGENTS.md`**：
 
-這個檔案在容器內是**唯讀掛載**的，agent 改不掉。
+- **Claude**：`cc` 以 `--append-system-prompt` 注入（來源 `$AGENT_RULES`）
+- **Codex**：`post-create.sh` 複製到 `$CODEX_HOME/AGENTS.md`，也就是 Codex 的全域層。
+  Codex 會再從 git root 往下讀專案的 `AGENTS.md` 並蓋在這份上面
+
+這個檔案放在 `.devcontainer/` 底下，而那個目錄在容器內是**唯讀掛載**的，agent 改不掉。
+（刻意用目錄 mount 而不是根目錄的單檔——單檔 mount 會因為 lock+rename 靜默脫鉤。）
 
 ## 執行環境
 
@@ -24,7 +25,8 @@ Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
 - 若 `.agent.env` 存在，啟動任何 server 前先載入它，一律使用其中的 `$PORT` 與
   `$COMPOSE_PROJECT_NAME`，避免和其他平行 agent 衝突。server 綁定 `0.0.0.0`。
 - 以下路徑唯讀，不要嘗試修改，也不要為了繞過它而改用別的路徑：
-  `.devcontainer/`、`.git/hooks/`、`AGENTS.md`（依 devcontainer.json 的 mounts 而定）。
+  `.devcontainer/`、`.git/hooks/`。專案若另外掛了 `AGENTS.md`、`.mcp.json`、`.claude/`
+  也一樣不要碰。
   `.git/config` 雖然可寫，**不要動它**——尤其不要設 `core.hooksPath`。
 - 出站網路走白名單。連不到某個網域時，回報給我，不要自己改防火牆或找替代通道。
 
@@ -47,31 +49,6 @@ Codex 原生讀這份 `AGENTS.md`。Claude 這邊**刻意不建立 `CLAUDE.md`**
 - `using-git-worktrees`：**跳過**。worktree 由使用者用 `agent-wt` 決定，不是你的事。
 - `finishing-a-development-branch`：做到「測試全綠 + 已 commit」就停，不要 merge、不要開 PR。
   最後輸出變更摘要與 `.agent/QUESTIONS.md` 內容。
-
-## 這個專案的規則
-
-<!-- 專案自訂：把這一節換成你的專案規則。常見的項目：
-
-- 對話、commit message、文件用什麼語言
-- 測試與 build 怎麼跑（npm test / pytest / ./gradlew test）
-- 哪些地方沒有測試覆蓋，回報時要主動講
-- 需求要不要先寫設計文件、放哪裡
-- 待辦清單在哪
-- 容器內刻意拿不到的資源（例如正式資料庫憑證），要查就把問題寫進
-  .agent/QUESTIONS.md
-- dev server 怎麼起（記得用 $PORT）
-- 明確不要 agent 做的事
-
-範例（來自 personalrecord）：
-
-- **一律用繁體中文**寫對話、commit message、文件與註解。
-- **測試**：`npm test`（vitest）。`npm run build` 也要能過。
-- **前端元件沒有測試基礎設施**，改 `.vue` 檔時測不到，回報裡要明講。
-- **需求要先有文件**：design doc 寫到 `docs/specs/`，不要只改程式碼就當做完。
-- **不要自作主張加功能**。資料是空的不等於該砍掉功能。
-- dev server：`npm run dev -- --host 0.0.0.0 --port $PORT`
--->
-
 
 ## 完成定義
 

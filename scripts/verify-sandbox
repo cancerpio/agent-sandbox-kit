@@ -35,7 +35,9 @@ for d in .devcontainer .claude .git/hooks; do
   chk "$d/ 不可寫"                            fail  bash -c "touch '$d/_probe'"
   rm -f "$d/_probe" 2>/dev/null || true
 done
-for f in AGENTS.md .mcp.json; do
+# 只列「你在 devcontainer.json 裡真的掛了唯讀」的單檔。沒掛的會 SKIP，
+# 但如果專案有這個檔案卻沒掛，這裡會 FAIL——那是提醒，不是誤報。
+for f in .mcp.json; do
   [ -e "$f" ] || { echo "  SKIP  $f 不存在"; continue; }
   chk "$f 不可寫"                             fail  bash -c "printf '' >> '$f'"
 done

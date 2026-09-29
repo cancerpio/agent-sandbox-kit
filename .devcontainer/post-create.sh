@@ -23,6 +23,15 @@ if ! grep -qs sandbox_mode "${CODEX_HOME}/config.toml"; then
     >> "${CODEX_HOME}/config.toml"
 fi
 
+# 沙箱規則放進 Codex 的「全域層」。官方行為：Codex 先讀 $CODEX_HOME/AGENTS.md，
+# 再從 git root 往下逐層讀專案的 AGENTS.md，後者因為排在後面而優先權更高。
+# 這樣 kit 不必碰專案根目錄的 AGENTS.md——那是專案自己的檔案。
+# （$CODEX_HOME 是 named volume，會蓋掉 image 裡的內容，所以要在這裡寫。）
+if [ -r "${AGENT_RULES:-}" ]; then
+  mkdir -p "$CODEX_HOME"
+  cp "$AGENT_RULES" "${CODEX_HOME}/AGENTS.md"
+fi
+
 # ---- 專案專屬初始化 ----
 # 裝依賴、chown 掛在 workspace 底下的 named volume 等，都寫在這支 hook 裡。
 # 必須在下面收斂 sudo 之前執行——收斂之後就沒有 chown 的權限了。
