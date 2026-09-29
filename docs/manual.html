@@ -1,0 +1,873 @@
+<title>Agent 沙箱操作手冊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --ground:    #fbfcfd;
+  --surface:   #eef2f6;
+  --surface-2: #e3e9ef;
+  --line:      #d2dae2;
+  --ink:       #17212b;
+  --ink-soft:  #4e5f70;
+  --muted:     #73838f;
+  --accent:    #0b6a68;
+  --accent-ink:#ffffff;
+  --pass:      #15704a;
+  --fail:      #b03225;
+  --warn:      #8a5a00;
+  --term-bg:   #16202a;
+  --term-ink:  #ccd8e2;
+  --term-dim:  #7d8d9c;
+
+  --step:  clamp(1.05rem, 0.9rem + 0.5vw, 1.2rem);
+  --h1:    clamp(2rem, 1.4rem + 2.4vw, 3.1rem);
+  --h2:    clamp(1.35rem, 1.1rem + 1vw, 1.75rem);
+  --h3:    1.06rem;
+  --radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:    #0e1419;
+    --surface:   #161f27;
+    --surface-2: #1d2832;
+    --line:      #2b3946;
+    --ink:       #dfe8f0;
+    --ink-soft:  #a9b8c6;
+    --muted:     #7e8f9d;
+    --accent:    #43b3ad;
+    --accent-ink:#06211f;
+    --pass:      #4cc38a;
+    --fail:      #f0776a;
+    --warn:      #d9a441;
+    --term-bg:   #070c11;
+    --term-ink:  #c6d3de;
+    --term-dim:  #6c7d8c;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:    #0e1419;
+  --surface:   #161f27;
+  --surface-2: #1d2832;
+  --line:      #2b3946;
+  --ink:       #dfe8f0;
+  --ink-soft:  #a9b8c6;
+  --muted:     #7e8f9d;
+  --accent:    #43b3ad;
+  --accent-ink:#06211f;
+  --pass:      #4cc38a;
+  --fail:      #f0776a;
+  --warn:      #d9a441;
+  --term-bg:   #070c11;
+  --term-ink:  #c6d3de;
+  --term-dim:  #6c7d8c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--step);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3.25rem;
+}
+
+h1, h2, h3, .eyebrow, .stat-n {
+  font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif;
+  text-wrap: balance;
+}
+
+/* ---------- header ---------- */
+header { display: flex; flex-direction: column; gap: 1rem; }
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 { font-size: var(--h1); font-weight: 700; margin: 0; line-height: 1.08; letter-spacing: -0.015em; }
+
+.lede { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  margin-top: 0.75rem;
+}
+.stat { background: var(--surface); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.15rem; }
+.stat-n {
+  font-size: 1.5rem; font-weight: 700; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.stat-n.ok { color: var(--pass); }
+.stat-l { font-size: 0.76rem; color: var(--muted); letter-spacing: 0.04em; }
+
+/* ---------- sections ---------- */
+section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+h2 {
+  font-size: var(--h2); font-weight: 700; margin: 0;
+  padding-bottom: 0.4rem; border-bottom: 2px solid var(--accent);
+  letter-spacing: -0.01em;
+}
+h3 { font-size: var(--h3); font-weight: 600; margin: 0; color: var(--ink); }
+
+p { margin: 0; max-width: 68ch; }
+p.note { color: var(--ink-soft); font-size: 0.94rem; }
+
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+code {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.86em;
+  background: var(--surface-2);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius);
+}
+
+/* ---------- steps ---------- */
+.steps { display: flex; flex-direction: column; gap: 1.6rem; list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.step { display: grid; grid-template-columns: 2.1rem 1fr; gap: 0 0.9rem; align-items: start; }
+.step::before {
+  counter-increment: s; content: counter(s);
+  font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; font-weight: 600;
+  color: var(--accent-ink); background: var(--accent);
+  width: 1.7rem; height: 1.7rem; border-radius: 50%;
+  display: grid; place-items: center; margin-top: 0.15rem;
+}
+.step > * { grid-column: 2; }
+.step-body { display: flex; flex-direction: column; gap: 0.7rem; }
+
+/* ---------- terminal ---------- */
+.term {
+  background: var(--term-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.term-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  background: color-mix(in srgb, var(--term-bg) 80%, #7f8f9f 20%);
+  border-bottom: 1px solid color-mix(in srgb, var(--term-bg) 60%, #7f8f9f 40%);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem; letter-spacing: 0.05em;
+  color: var(--term-dim);
+}
+.term-bar b { font-weight: 500; color: var(--term-ink); }
+.term pre {
+  margin: 0; padding: 0.9rem 1rem;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.82rem; line-height: 1.7;
+  color: var(--term-ink);
+  tab-size: 2;
+}
+.cmd { color: var(--term-ink); font-weight: 500; }
+.cmd::before { content: "$ "; color: var(--accent); }
+.out { color: var(--term-dim); }
+.ok  { color: var(--pass); }
+.bad { color: var(--fail); }
+.cm  { color: var(--term-dim); font-style: italic; }
+
+/* ---------- checks grid ---------- */
+.checks {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
+  gap: 1px; background: var(--line); border: 1px solid var(--line);
+}
+.chk-group { background: var(--surface); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.chk-group h3 { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.chk { display: flex; gap: 0.5rem; align-items: baseline; font-size: 0.87rem; color: var(--ink-soft); }
+.chk::before { content: "✓"; color: var(--pass); font-weight: 700; font-size: 0.82rem; }
+
+/* ---------- tables ---------- */
+.tscroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; font-size: 0.89rem; min-width: 34rem; }
+th, td { padding: 0.55rem 0.8rem; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th {
+  background: var(--surface-2); font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-weight: 700; font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+  position: sticky; top: 0;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 55%, transparent); }
+td.num { font-variant-numeric: tabular-nums; font-family: "IBM Plex Mono", monospace; font-size: 0.82rem; }
+.y { color: var(--pass); font-weight: 600; }
+.n { color: var(--fail); font-weight: 600; }
+.w { color: var(--warn); font-weight: 600; }
+
+/* ---------- callout ---------- */
+.callout {
+  border-left: 3px solid var(--warn);
+  background: var(--surface);
+  padding: 0.85rem 1.1rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+.callout.danger { border-left-color: var(--fail); }
+.callout.lesson { border-left-color: var(--accent); }
+
+/* 問題 → 解法 的成對區塊 */
+.pair { display: flex; flex-direction: column; gap: 0.35rem; }
+.pair-row { display: grid; grid-template-columns: 4.2rem 1fr; gap: 0.7rem; align-items: baseline; }
+.pair-row > span:first-child {
+  font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); text-align: right;
+}
+.pair-row.fix > span:first-child { color: var(--accent); }
+.pair-row > span:last-child { font-size: 0.93rem; color: var(--ink-soft); }
+@media (max-width: 34rem) {
+  .pair-row { grid-template-columns: 1fr; gap: 0.1rem; }
+  .pair-row > span:first-child { text-align: left; }
+}
+.callout h3 { font-size: 0.95rem; }
+.callout p { font-size: 0.92rem; color: var(--ink-soft); }
+
+footer {
+  border-top: 1px solid var(--line); padding-top: 1.25rem;
+  font-size: 0.85rem; color: var(--muted);
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+@media (max-width: 34rem) {
+  .step { grid-template-columns: 1fr; }
+  .step::before { grid-column: 1; margin-bottom: 0.35rem; }
+  .step > * { grid-column: 1; }
+}
+</style>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">agent-sandbox-kit</div>
+  <h1>Agent 沙箱操作手冊</h1>
+  <p class="lede">
+    讓 Claude Code 和 Codex 在隔離容器裡全權限執行、不問授權，並可用 git worktree 平行開多個。
+    容器就是邊界，所以兩個 agent 都以 bypass 模式跑。
+  </p>
+  <div class="stats">
+    <div class="stat"><span class="stat-n ok">18</span><span class="stat-l">邊界檢查全數通過</span></div>
+    <div class="stat"><span class="stat-n">9</span><span class="stat-l">設定檔案</span></div>
+    <div class="stat"><span class="stat-n">3</span><span class="stat-l">shell script</span></div>
+    <div class="stat"><span class="stat-n">2</span><span class="stat-l">agent（Claude／Codex）</span></div>
+  </div>
+</header>
+
+<div class="callout danger">
+  <h3>只用於你自己信任的 repo</h3>
+  <p>
+    bypass 模式下，惡意專案可以讀走容器內 <code>~/.claude</code>、<code>~/.codex</code> 的登入憑證。
+    這是 Anthropic 官方明列的限制。不可信的第三方程式碼請用 VM 或 cloud session。
+  </p>
+</div>
+
+<!-- ============ 前置 ============ -->
+<section>
+  <h2>前置作業（每台機器一次）</h2>
+
+  <ol class="steps">
+    <li class="step"><div class="step-body">
+      <h3>確認 git 版本 ≥ 2.48</h3>
+      <p class="note">worktree 的相對路徑需要這個版本，否則主機端無法操作容器建出來的 worktree。</p>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · zsh</div>
+<pre><span class="cmd">brew install git &amp;&amp; git --version</span>
+<span class="out">git version 2.50.1 (Apple Git-155)</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>把 kit 複製到你的專案</h3>
+      <p class="note">kit <strong>不會碰</strong>你專案根目錄的 <code>AGENTS.md</code>——沙箱規則放在
+      <code>.devcontainer/sandbox-rules.md</code>。接著依 <a href="../README.md">README</a>
+      調整 <code>devcontainer.json</code> 裡標了「專案自訂」的幾個地方。</p>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · 你的專案根目錄</div>
+<pre><span class="cmd">KIT=/path/to/agent-sandbox-kit</span>
+<span class="cmd">cp -r $KIT/.devcontainer $KIT/scripts $KIT/prompts .</span>
+<span class="cmd">chmod +x scripts/* .devcontainer/*.sh</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>把 superpowers skills 接到容器讀得到的位置</h3>
+      <p class="note">容器內以唯讀掛載這個路徑。superpowers 升版後版本號目錄會換，重跑一次 <code>ln -sfn</code> 指到新版即可。</p>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · zsh</div>
+<pre><span class="cmd">mkdir -p ~/.agent-skills</span>
+<span class="cmd">ln -sfn ~/.claude/plugins/cache/claude-plugins-official/superpowers/6.3.0 \
+        ~/.agent-skills/superpowers</span>
+<span class="cmd">ls -l ~/.agent-skills/</span>
+<span class="out">superpowers -&gt; /Users/…/superpowers/6.3.0</span></pre>
+      </div>
+    </div></li>
+  </ol>
+
+  <p class="note">
+    <strong>不需要 bootstrap。</strong> 早期版本要求先在主機建一個拋棄式 worktree 來升級
+    <code>.git/config</code>，那是因為當時把 <code>.git/config</code> 掛成唯讀。現在已改用
+    <code>core.hooksPath</code> 檢查取代，這個步驟整個取消了。
+  </p>
+</section>
+
+<!-- ============ 每次要用 ============ -->
+<section>
+  <h2>每次要用</h2>
+
+  <ol class="steps">
+    <li class="step"><div class="step-body">
+      <h3>起容器</h3>
+      <p class="note">第一次會 build（apt、Node、兩個 agent，約數分鐘），之後幾秒就好。<code>--config</code> 可以省略，CLI 會自己找 <code>.devcontainer/devcontainer.json</code>。</p>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · 專案根目錄</div>
+<pre><span class="cmd">npx @devcontainers/cli up --workspace-folder .</span>
+<span class="out">[post-create] 完成。cc = Claude、cx = Codex、agent-wt new &lt;name&gt; 開平行 agent。</span>
+<span class="out">Removing user vscode from group sudo</span>
+<span class="out">Running the postStartCommand from devcontainer.json...</span>
+<span class="out">[firewall] fetching GitHub meta</span>
+<span class="ok">[firewall] OK：出站已限制在白名單內（12 個網域 + GitHub IP 段）</span>
+<span class="out">{"outcome":"success","remoteUser":"vscode",</span>
+<span class="out"> "remoteWorkspaceFolder":"/workspaces/&lt;project&gt;"}</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>進容器</h3>
+      <div class="term">
+        <div class="term-bar"><b>主機</b> · 專案根目錄</div>
+<pre><span class="cmd">npx @devcontainers/cli exec --workspace-folder . bash</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>第一次要登入兩個 agent</h3>
+      <p class="note">登入狀態存在 named volume，只有 rebuild 才需要重登。瀏覽器回調失敗時，把畫面上的代碼貼回終端機。</p>
+      <div class="term">
+        <div class="term-bar"><b>容器</b> · vscode@/workspaces/&lt;project&gt;</div>
+<pre><span class="cmd">claude</span>       <span class="cm"># 依提示登入後離開</span>
+<span class="cmd">codex login</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>驗證邊界 — 每次都要跑</h3>
+      <p class="note">單檔唯讀 mount 會靜默脫鉤（見下方警告），所以這不是只跑第一次的儀式。全 PASS 才往下做。</p>
+      <div class="term">
+        <div class="term-bar"><b>容器</b> · verify-sandbox</div>
+<pre><span class="cmd">verify-sandbox</span>
+<span class="out">== agent sandbox 驗證 ==</span>
+<span class="out">-- 防火牆 --</span>
+<span class="ok">  PASS</span><span class="out">  防火牆已就緒（/run/firewall-ok）</span>
+<span class="ok">  PASS</span><span class="out">  白名單外的站台連不到（example.com）</span>
+<span class="ok">  PASS</span><span class="out">  Anthropic API 連得到</span>
+<span class="ok">  PASS</span><span class="out">  npm registry 連得到</span>
+<span class="out">-- sudo --</span>
+<span class="ok">  PASS</span><span class="out">  不能用 sudo 做任意事</span>
+<span class="ok">  PASS</span><span class="out">  不能帶參數執行防火牆腳本</span>
+<span class="out">-- 控制面唯讀 --</span>
+<span class="ok">  PASS</span><span class="out">  .devcontainer/ 不可寫</span>   <span class="cm"># 沙箱規則在這裡面</span>
+<span class="out">  SKIP  .claude 不存在</span>              <span class="cm"># 選配，專案有才打開</span>
+<span class="ok">  PASS</span><span class="out">  .git/hooks/ 不可寫</span>
+<span class="out">  SKIP  .mcp.json 不存在</span>            <span class="cm"># 選配</span>
+<span class="ok">  PASS</span><span class="out">  core.hooksPath 未被設定</span>
+<span class="out">-- git 仍可正常工作 --</span>
+<span class="ok">  PASS</span><span class="out">  git identity 已設定</span>
+<span class="ok">  PASS</span><span class="out">  可以寫入 .git/objects（commit 可行）</span>
+<span class="out">-- VS Code 逃逸路徑（必須全空）--</span>
+<span class="ok">  PASS</span><span class="out">  VSCODE_IPC_HOOK_CLI 為空</span>
+<span class="ok">  PASS</span><span class="out">  GIT_ASKPASS 為空</span>
+<span class="ok">  PASS</span><span class="out">  BROWSER 為空</span>
+<span class="ok">  PASS</span><span class="out">  SSH_AUTH_SOCK 為空</span>
+<span class="ok">  PASS</span><span class="out">  沒有 vscode IPC socket</span>
+<span class="out">-- 憑證不在容器內 --</span>
+<span class="ok">  PASS</span><span class="out">  沒有 ~/.ssh</span>
+<span class="ok">  PASS</span><span class="out">  沒有主機 docker.sock</span>
+
+<span class="ok">PASS=18 FAIL=0</span></pre>
+      </div>
+    </div></li>
+
+    <li class="step"><div class="step-body">
+      <h3>啟動 agent</h3>
+      <p class="note"><code>cc</code> 與 <code>cx</code> 是 image 內的執行檔，會在防火牆未就緒時拒絕啟動。</p>
+      <div class="term">
+        <div class="term-bar"><b>容器</b></div>
+<pre><span class="cmd">cc</span>    <span class="cm"># Claude（bypass + superpowers + 沙箱規則注入系統提示）</span>
+<span class="cmd">cx</span>    <span class="cm"># Codex（danger-full-access）</span></pre>
+      </div>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ============ 平行 ============ -->
+<section>
+  <h2>平行開多個 agent</h2>
+
+  <p>
+    沒有 worktree 的話，agent 和你共用同一個 checkout——它一切分支，你編輯器裡的檔案就整批被換掉。
+    <code>agent-wt new</code> 一次處理四件事：建 worktree 與分支、裝依賴、配一個不重複的 PORT、在 tmux 開視窗。
+  </p>
+
+  <div class="term">
+    <div class="term-bar"><b>容器</b> · agent-wt</div>
+<pre><span class="cmd">agent-wt new feat-a claude "把動作總覽的欄位改成三欄"</span>
+<span class="out">added 162 packages in 3s</span>
+<span class="out">agent-wt: worktree=/workspaces/&lt;project&gt;/.worktrees/feat-a 分支=agent/feat-a PORT=3120</span>
+<span class="out">agent-wt: [claude] 已在 tmux agents:feat-a 啟動 → tmux attach -t agents</span>
+
+<span class="cmd">cat .worktrees/feat-a/.git</span>
+<span class="ok">gitdir: ../../.git/worktrees/feat-a</span>   <span class="cm"># 相對路徑，主機端才操作得到</span>
+
+<span class="cmd">agent-wt new feat-b codex @docs/some-prompt.md</span>
+<span class="cmd">tmux attach -t agents</span>   <span class="cm"># 切視窗：Ctrl-b n / Ctrl-b w</span></pre>
+  </div>
+
+  <p class="note">
+    dev server 要用 <code>.agent.env</code> 裡的 <code>$PORT</code>：
+    <code>npm run dev -- --host 0.0.0.0 --port $PORT</code>
+  </p>
+</section>
+
+<!-- ============ 收成 ============ -->
+<section>
+  <h2>收成（主機或容器都可以）</h2>
+
+  <p class="note">沒有 <code>agent-wt diff</code> 或 <code>agent-wt rm</code>——那些本來就各是一行原生 git，包起來不會更短。</p>
+
+  <div class="term">
+    <div class="term-bar"><b>主機</b> · 路徑前綴和容器不同，但相對連結兩邊都通</div>
+<pre><span class="cmd">git worktree list</span>
+<span class="out">~/Project/&lt;project&gt;                  a908449 [main]</span>
+<span class="out">~/Project/&lt;project&gt;/.worktrees/feat-a a908449 [agent/feat-a]</span>
+
+<span class="cmd">git diff main...agent/feat-a</span>
+<span class="cmd">git merge agent/feat-a</span>
+<span class="cmd">git worktree remove .worktrees/feat-a &amp;&amp; git branch -d agent/feat-a</span>
+<span class="cmd">git push</span></pre>
+  </div>
+
+  <div class="callout danger">
+    <h3>放 agent 進去之前先 push</h3>
+    <p>
+      專案目錄在容器內可寫（agent 要能改程式碼），<code>.git</code> 也在裡面。
+      沙箱規則禁止它砍歷史，但那是文字約束不是機制。
+      沒 push 的 commit 被砍掉就是沒了；先 push，最壞情況只是重新 clone。
+    </p>
+  </div>
+</section>
+
+<!-- ============ 擋得住什麼 ============ -->
+<section>
+  <h2>擋得住什麼</h2>
+
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>威脅</th><th>狀態</th><th>靠什麼擋</th></tr></thead>
+    <tbody>
+      <tr><td>誤碰專案外的檔案（<code>~/.ssh</code>、其他 repo）</td><td class="y">擋住</td><td>容器邊界</td></tr>
+      <tr><td>弄壞開發環境（nvm、全域 CLI）</td><td class="y">擋住</td><td>容器邊界</td></tr>
+      <tr><td>一直要按授權</td><td class="y">解決</td><td>兩個 agent 都 bypass</td></tr>
+      <tr><td>改到會在主機執行的檔案</td><td class="y">擋住</td><td><code>.devcontainer/</code>（含沙箱規則）、<code>.git/hooks/</code> 唯讀</td></tr>
+      <tr><td><code>git push</code></td><td class="y">擋住</td><td>容器內沒有憑證（未掛 <code>~/.ssh</code>、無 credential helper）</td></tr>
+      <tr><td>agent 自己關掉防火牆</td><td class="y">擋住</td><td>sudo 收斂成只能跑防火牆腳本且不能帶參數</td></tr>
+      <tr><td>VS Code IPC 逃逸（容器內在主機執行指令）</td><td class="y">不存在</td><td>走 CLI，容器內沒有編輯器 process</td></tr>
+      <tr><td>把東西往外送</td><td class="w">部分</td><td>出站白名單，但 <strong>IP 粒度</strong>且<strong>無紀錄</strong></td></tr>
+      <tr><td>砍掉 <code>.git</code> 歷史</td><td class="n">擋不住</td><td>設計如此，靠「先 push」</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <h3>已知的洞：單檔唯讀 mount 會靜默脫鉤</h3>
+    <p>
+      工具改檔案常用「寫 <code>.lock</code> 再 rename」，換的是 inode；主機那側一旦換掉檔案，
+      容器裡的 mount 就脫鉤、檔案變回可寫，<strong>沒有任何錯誤訊息</strong>。
+    </p>
+    <p>
+      <strong>目錄的 mount 沒這問題</strong>——這正是沙箱規則放在
+      <code>.devcontainer/sandbox-rules.md</code> 而不是根目錄單檔的原因之一。
+      會受影響的只有你自己打開的那幾條單檔 mount（<code>AGENTS.md</code>、<code>.mcp.json</code>）：
+      在主機上編輯過就會脫鉤。開發這份設定時實測到，一次就中：
+    </p>
+    <div class="term">
+      <div class="term-bar"><b>容器</b> · 主機剛編輯過某個單檔 mount 的來源之後</div>
+<pre><span class="cmd">verify-sandbox</span>
+<span class="bad">  FAIL</span><span class="out">  .mcp.json 不可寫  → &lt;rc=0&gt;</span>
+<span class="bad">PASS=17 FAIL=1</span>
+<span class="out">有項目未通過，請先修好再放 agent 進來。</span></pre>
+    </div>
+    <p>修法是重建容器：</p>
+    <div class="term">
+      <div class="term-bar"><b>主機</b></div>
+<pre><span class="cmd">docker rm -f $(docker ps -aq --filter label=devcontainer.local_folder=$PWD)</span>
+<span class="cmd">npx @devcontainers/cli up --workspace-folder .</span>
+<span class="ok">PASS=18 FAIL=0</span></pre>
+    </div>
+  </div>
+
+  <p class="note">
+    <strong>緊急關閉防火牆</strong>：sudo 已收斂，容器內辦不到。從主機下
+    <code>docker exec -it -u root &lt;容器&gt; bash</code>。
+  </p>
+</section>
+
+<!-- ============ 踩過的坑 ============ -->
+<section>
+  <h2>踩過的坑</h2>
+
+  <p>
+    建這套東西時撞到的問題與最後的解法。多數不是設定寫錯，是<strong>主機與容器的環境差異</strong>在某個沒預期的地方冒出來。
+  </p>
+
+  <h3>一、為什麼要掛整個 repo，而不是只掛 worktree</h3>
+
+  <p class="note">
+    直覺上「agent 只該看到它那個 worktree」比較安全，但那樣做 git 完全無法運作，原因有兩層。
+  </p>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row"><span>第一層</span><span>
+        worktree 目錄裡的 <code>.git</code> 不是目錄，是一行指路文字，指向主 repo 的
+        <code>.git/worktrees/&lt;name&gt;</code>。只掛 worktree 的話這個目標不存在。
+      </span></div>
+      <div class="pair-row"><span>第二層</span><span>
+        <strong>worktree 沒有自己的 object database。</strong> 所有 commit、tree、blob 都存在
+        主 repo 的 <code>.git/objects/</code>。就算想辦法把路徑接通，物件根本不在那裡——
+        這不是路徑問題，是 worktree 的設計就是共用主 repo 的物件庫。
+      </span></div>
+      <div class="pair-row fix"><span>結論</span><span>
+        掛整個 repo 根目錄不是偷懶，是唯一可行的做法。代價是 <code>.git</code> 可寫、
+        agent 有能力砍歷史，所以才有「放 agent 進去之前先 push」這條規則。
+      </span></div>
+    </div>
+  </div>
+
+  <h3>二、worktree 的連結必須是相對路徑</h3>
+
+  <p class="note">
+    主機看到的是 <code>~/Project/&lt;project&gt;</code>，容器看到的是
+    <code>/workspaces/&lt;project&gt;</code>。連結寫絕對路徑，就只有建立它的那一邊能用。
+  </p>
+
+  <div class="term">
+    <div class="term-bar">絕對 vs 相對</div>
+<pre><span class="bad">gitdir: /workspaces/&lt;project&gt;/.git/worktrees/feat-a</span>  <span class="cm"># 主機打不開</span>
+<span class="ok">gitdir: ../../.git/worktrees/feat-a</span>                      <span class="cm"># 兩邊都通</span></pre>
+  </div>
+
+  <p class="note">
+    <code>agent-wt</code> 跑在容器內，所以不加 <code>--relative-paths</code> 時斷掉的是<strong>主機</strong>那邊。
+    更麻煩的是主機的 <code>git gc</code> 會順便 <code>worktree prune</code>，看到指不到的路徑就把註冊清掉，
+    反過來也弄壞容器那側。
+  </p>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row"><span>症狀</span><span>加了 <code>--relative-paths</code> 卻還是絕對路徑，只印一行 WARN</span></div>
+      <div class="pair-row"><span>原因 1</span><span>
+        偵測條件 grep 的是字面 <code>--relative-paths</code>，但 git 的 help 印的是
+        <code>--[no-]relative-paths</code>——那個子字串在任何版本都不存在
+      </span></div>
+      <div class="pair-row"><span>原因 2</span><span>
+        腳本開頭有 <code>set -o pipefail</code>，而 <code>git worktree add -h</code> 的離開碼是
+        <strong>129</strong>（usage），pipeline 因此永遠回傳非零，條件永遠成立
+      </span></div>
+      <div class="pair-row fix"><span>解法</span><span>
+        不用 pipeline，改成 <code>case "$(git worktree add -h 2>&amp;1 || true)" in *relative-paths*)</code>
+      </span></div>
+      <div class="pair-row"><span>教訓</span><span>
+        兩個 bug 疊在一起，各自都足以讓功能失效——而失效時只有一行 WARN，很容易忽略
+      </span></div>
+    </div>
+  </div>
+
+  <h3>三、node_modules 在 macOS 裝、拿到 Linux 容器裡會炸</h3>
+
+  <p class="note">
+    專案目錄是 bind mount，<code>node_modules</code> 預設也跟著進容器。但主機是
+    macOS（darwin-arm64），容器是 Linux（linux-arm64），<strong>原生 binary 不相容</strong>。
+  </p>
+
+  <div class="term">
+    <div class="term-bar"><b>容器</b> · npm test</div>
+<pre><span class="bad">Cannot find module '@rolldown/binding-linux-arm64-gnu'</span>
+<span class="out">Require stack:</span>
+<span class="out">- /workspaces/&lt;project&gt;/node_modules/rolldown/dist/shared/binding-….mjs</span></pre>
+  </div>
+
+  <div class="callout lesson">
+    <div class="pair">
+      <div class="pair-row fix"><span>解法</span><span>
+        <code>node_modules</code> 改用 named volume 疊在 bind mount 上，容器有自己的一份，
+        由 <code>post-create.sh</code> 跑 <code>npm ci</code> 填充。主機那份完全不受影響，兩邊可同時跑
+      </span></div>
+      <div class="pair-row"><span>順帶</span><span>
+        named volume 預設 root 擁有，要先 <code>chown</code>——而這必須排在 post-create
+        收斂 sudo <strong>之前</strong>，否則就沒權限了
+      </span></div>
+      <div class="pair-row"><span>副作用</span><span>升級依賴後要 rebuild container，或在容器內自己再 <code>npm ci</code> 一次</span></div>
+    </div>
+  </div>
+
+  <h3>四、其餘的坑</h3>
+
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>症狀</th><th>原因</th><th>解法</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>worktree add</code> 失敗：<br><code>could not write config file .git/config: Resource busy</code></td>
+        <td>首次建相對路徑 worktree 要寫 <code>core.repositoryformatversion=1</code> 與
+            <code>extensions.relativeworktrees</code>，但 <code>.git/config</code> 當時掛成唯讀。
+            錯誤是 EBUSY（rename 蓋不過掛載點），不是權限錯誤</td>
+        <td>拿掉那個唯讀 mount。它本來也留不住（見下一列），而它擋掉的威脅
+            （<code>core.hooksPath</code>）改由 <code>verify-sandbox</code> 直接檢查</td>
+      </tr>
+      <tr>
+        <td>唯讀保護沒有任何錯誤訊息就消失</td>
+        <td>單一檔案的 bind mount，只要主機那側用「寫 <code>.lock</code> 再 rename」換掉檔案
+            （git 與多數編輯器都這樣做），mount 就脫鉤。目錄的 mount 沒這問題</td>
+        <td>只掛目錄；剩下的單檔靠 <code>verify-sandbox</code> 每次偵測，FAIL 就重建容器</td>
+      </tr>
+      <tr>
+        <td>agent 建好 worktree 卻沒啟動，tmux 回
+            <code>command too long</code></td>
+        <td>啟動指令把整份 <code>AGENTS.md</code> 用 <code>printf %q</code> 內嵌命令列，外層再包一次。
+            中文每個字會展開成多個八進位跳脫，長度爆增</td>
+        <td>產生一支 runner 腳本，內容在腳本裡才展開，tmux 只拿到一個路徑</td>
+      </tr>
+      <tr>
+        <td>sudo 收斂寫在 Dockerfile 卻沒效果</td>
+        <td>devcontainer features 疊在 image 之上、以 root 執行，
+            <code>common-utils</code> 之類會把 <code>NOPASSWD:ALL</code> 寫回來</td>
+        <td>收斂移到 <code>post-create.sh</code> 的最後一步（features 跑完之後）</td>
+      </tr>
+      <tr>
+        <td>收斂了 sudo，agent 仍能改防火牆</td>
+        <td>sudoers 裡命令不寫參數 = 允許任意參數，agent 可以指向自己寫的全放行清單
+            重新執行防火牆腳本</td>
+        <td>把參數釘死：<code>NOPASSWD: /usr/local/share/init-firewall.sh ""</code>
+            （<code>""</code> 表示只允許不帶參數）</td>
+      </tr>
+      <tr>
+        <td>agent 無法 commit：<code>Please tell me who you are</code></td>
+        <td>VS Code 的擴充會自動複製主機 <code>.gitconfig</code>，<strong>CLI 不會</strong>。
+            用 Antigravity 只能走 CLI，所以一定會撞到</td>
+        <td><code>post-create.sh</code> 設 <code>user.name</code> / <code>user.email</code></td>
+      </tr>
+      <tr>
+        <td>防火牆啟動時 WARN <code>無法解析 statsig.anthropic.com</code></td>
+        <td>該網域解析不到</td>
+        <td>從白名單移除，少一行噪音</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout lesson">
+    <h3>一個測試方法上的教訓</h3>
+    <p>
+      查「唯讀 mount 會不會擋住 <code>worktree add</code>」時，先在容器外用
+      <code>chmod 444 .git/config</code> 模擬——結果 git 照樣寫成功，差點得出錯誤結論。
+    </p>
+    <p>
+      原因是 <strong>git 不原地改檔案</strong>：它寫一個 <code>.lock</code> 再 <code>rename()</code> 蓋過去，
+      而 <code>rename()</code> 檢查的是<strong>目錄</strong>權限，不是檔案權限。
+      唯讀 bind mount 是掛載層的限制，行為完全不同。
+    </p>
+    <p><strong>mount 的語意只能在真容器裡驗，權限位元模擬不出來。</strong></p>
+  </div>
+</section>
+
+<!-- ============ 差異 ============ -->
+<section>
+  <h2>與 Claude Code 官方範例的差異</h2>
+
+  <p>
+    對照對象是 <code>anthropics/claude-code</code> 的 <code>.devcontainer/</code>。
+    官方自己的定位是「a working example rather than a maintained base image」——
+    一份示範怎麼拼起來的範例，不是維護中的基底。
+  </p>
+
+  <h3>規模</h3>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>項目</th><th>官方範例</th><th>本專案</th></tr></thead>
+    <tbody>
+      <tr><td>檔案數</td><td class="num">3</td><td class="num">8（含 1 份文件、1 份白名單資料）</td></tr>
+      <tr><td>shell script</td><td class="num">1</td><td class="num">3</td></tr>
+      <tr><td>支援的 agent</td><td>Claude</td><td>Claude + Codex</td></tr>
+      <tr><td>agent 版本</td><td><code>latest</code>，且容器內自動更新</td><td>釘死於 Dockerfile，關閉自動更新</td></tr>
+      <tr><td>預期用法</td><td>VS Code「Reopen in Container」</td><td><code>@devcontainers/cli</code>（Antigravity 拿不到微軟的擴充）</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>沿用官方的部分</h3>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>設定</th><th>做法</th></tr></thead>
+    <tbody>
+      <tr><td><code>runArgs</code></td><td>完全相同：<code>--cap-add=NET_ADMIN</code>、<code>--cap-add=NET_RAW</code></td></tr>
+      <tr><td><code>postStartCommand</code></td><td>相同的單行 <code>sudo …/init-firewall.sh</code></td></tr>
+      <tr><td><code>waitFor</code></td><td><code>postStartCommand</code>——防火牆跑完才交出終端機</td></tr>
+      <tr><td>登入狀態保存</td><td><code>~/.claude</code> 用 named volume ＋ <code>CLAUDE_CONFIG_DIR</code></td></tr>
+      <tr><td>非 root 使用者</td><td>官方用 <code>node</code>，本專案用 <code>vscode</code>（bypass 旗標在 root 下會被拒絕）</td></tr>
+      <tr><td><code>init-firewall.sh</code></td><td>以官方版本為基礎改寫</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>本專案多出來的</h3>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>功能</th><th>官方</th><th>本專案</th><th>為什麼</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Codex 支援</td><td class="n">無</td><td class="y">有</td>
+        <td>Codex CLI 的網路只有開關、沒有網域白名單（managed allowlist 是 ChatGPT Work 的功能），所以容器是唯一 vendor-neutral 的邊界</td>
+      </tr>
+      <tr>
+        <td>防火牆 fail-closed</td><td class="n">無</td><td class="y">有</td>
+        <td><code>trap lockdown ERR</code>：DNS 不通、GitHub meta 抓不到等任一步失敗，就把政策設成 DROP 再退出，而不是留下一個沒防火牆的容器</td>
+      </tr>
+      <tr>
+        <td>防火牆就緒旗標</td><td class="n">無</td><td class="y"><code>/run/firewall-ok</code></td>
+        <td><code>cc</code> / <code>cx</code> 在旗標不存在時拒絕啟動</td>
+      </tr>
+      <tr>
+        <td>白名單獨立成檔</td><td class="n">寫死在腳本</td><td class="y"><code>allowed-domains.txt</code></td>
+        <td>放在 image 內，agent 改不到；要加網域不必動腳本</td>
+      </tr>
+      <tr>
+        <td>sudo 收斂</td><td class="n">保留完整 sudo</td><td class="y">只能跑防火牆腳本且不能帶參數</td>
+        <td>否則 agent 可以 <code>iptables -F</code>，或指向自己寫的全放行清單重建防火牆</td>
+      </tr>
+      <tr>
+        <td>控制面唯讀</td><td class="n">無</td><td class="y">5 個路徑</td>
+        <td><code>.git/hooks</code>、<code>.mcp.json</code> 這類檔案是<strong>由主機端工具執行</strong>的，寫進去等於在等你觸發</td>
+      </tr>
+      <tr>
+        <td>IPC 環境變數清空</td><td class="n">無</td><td class="y"><code>remoteEnv</code> 清 5 個</td>
+        <td>走 CLI 本來就沒有這條路，這是「萬一改用擴充套件開」的保險</td>
+      </tr>
+      <tr>
+        <td>邊界自我驗證</td><td class="n">無</td><td class="y"><code>verify-sandbox</code>（21 項）</td>
+        <td>單檔 mount 脫鉤是無聲的，沒有它會以為防護還在</td>
+      </tr>
+      <tr>
+        <td>平行 agent</td><td class="n">無</td><td class="y"><code>agent-wt new</code></td>
+        <td>worktree + 依賴 + 不重複的 PORT + tmux 視窗</td>
+      </tr>
+      <tr>
+        <td>行為規則</td><td class="n">無</td><td class="y"><code>sandbox-rules.md</code></td>
+        <td>Codex 原生讀這個檔名；Claude 由 <code>cc</code> 以 <code>--append-system-prompt</code> 注入</td>
+      </tr>
+      <tr>
+        <td><code>node_modules</code></td><td class="n">不處理</td><td class="y">named volume</td>
+        <td>主機是 macOS，原生 binary 是 darwin-arm64，掛進 Linux 容器會找不到 binding</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>官方有而本專案刻意不要的</h3>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>官方的做法</th><th>本專案</th><th>理由</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Reopen in Container 為主要用法</td><td>只用 CLI</td>
+        <td>擴充套件會注入 IPC socket、轉發 SSH agent 與 GPG，容器內可反向在主機執行指令。Trail of Bits 的結論是不建議用於不可信程式碼</td>
+      </tr>
+      <tr>
+        <td>zsh + powerlevel10k + git-delta</td><td>不裝</td>
+        <td>agent 不需要好看的 shell，image 可以小一點</td>
+      </tr>
+      <tr>
+        <td><code>CLAUDE_CODE_VERSION=latest</code> ＋ 自動更新</td><td>釘死版本</td>
+        <td>Anthropic 自己也建議：要可重現的 build 就用 <code>npm i -g …@X.Y.Z</code> 而非 feature</td>
+      </tr>
+      <tr>
+        <td>eslint / prettier / gitlens 擴充</td><td>只留兩個 agent 的擴充</td>
+        <td>編輯器在主機，容器內的擴充用不到</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ============ 檔案 ============ -->
+<section>
+  <h2>檔案</h2>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>路徑</th><th>行數</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td><code>.devcontainer/devcontainer.json</code></td><td class="num">96</td><td>mount、能力、環境變數、生命週期</td></tr>
+      <tr><td><code>.devcontainer/Dockerfile</code></td><td class="num">61</td><td>base image、工具、兩個 agent（版本釘死）、<code>cc</code>／<code>cx</code></td></tr>
+      <tr><td><code>.devcontainer/init-firewall.sh</code></td><td class="num">84</td><td>出站白名單，fail-closed</td></tr>
+      <tr><td><code>.devcontainer/allowed-domains.txt</code></td><td class="num">32</td><td>白名單網域（在 image 內）</td></tr>
+      <tr><td><code>.devcontainer/post-create.sh</code></td><td class="num">57</td><td>git identity、Codex 設定、<code>npm ci</code>、最後收斂 sudo</td></tr>
+      <tr><td><code>scripts/agent-wt</code></td><td class="num">89</td><td><code>agent-wt new</code>：worktree ＋ 依賴 ＋ PORT ＋ tmux</td></tr>
+      <tr><td><code>scripts/verify-sandbox</code></td><td class="num">66</td><td>邊界檢查。預設安裝跑 18 項，打開選配 mount 後最多 21 項</td></tr>
+      <tr><td><code>.devcontainer/sandbox-rules.md</code></td><td class="num">57</td><td>沙箱環境的規則。Claude 由 <code>cc</code> 注入，Codex 由 post-create 放進 <code>$CODEX_HOME</code> 全域層</td></tr>
+      <tr><td><code>.devcontainer/project-setup.sh.example</code><br><code>.worktree-setup.sh.example</code></td><td class="num">12<br>7</td><td>裝依賴的 hook 範例。複製成無 <code>.example</code> 的檔名並填入 <code>npm ci</code> / <code>uv sync</code> 等</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>三個容易誤解的設計</h3>
+  <div class="tscroll">
+  <table>
+    <thead><tr><th>看起來奇怪的地方</th><th>原因</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>規則不放在專案根目錄</td>
+        <td>規則放在專案根目錄有兩個問題：會蓋掉專案自己的 <code>AGENTS.md</code>，而且主機上的 session 也會讀到「你在容器內、權限全開」——在主機上是錯的。所以規則放 <code>.devcontainer/sandbox-rules.md</code>：Claude 由 <code>cc</code> 以 <code>--append-system-prompt</code> 注入，Codex 由 post-create 複製到 <code>$CODEX_HOME/AGENTS.md</code>（全域層，專案自己的 <code>AGENTS.md</code> 優先權更高）。兩邊都不碰你的檔案</td>
+      </tr>
+      <tr>
+        <td><code>cc</code>／<code>cx</code> 是執行檔不是 alias</td>
+        <td><code>agent-wt</code> 產生的 runner 是非互動 bash，不會 source <code>/etc/bash.bashrc</code>，函式放那裡用不到；而且烤進 image 後 agent 改不掉</td>
+      </tr>
+      <tr>
+        <td>sudo 收斂在 <code>post-create.sh</code> 而非 <code>Dockerfile</code></td>
+        <td>devcontainer features 疊在 image 之上、以 root 執行，會把 <code>NOPASSWD:ALL</code> 寫回來，抵銷 Dockerfile 裡做的任何收斂。所以收斂必須是最後一步</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  <div>agent-sandbox-kit · <code>docs/manual.html</code></div>
+  <div>安裝與設定：<a href="../README.md">README.md</a>　·　開發歷程與否決過的方向：<a href="agent-sandbox-kit-review.md">docs/agent-sandbox-kit-review.md</a></div>
+</footer>
+
+</div>

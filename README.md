@@ -246,6 +246,7 @@ socket 並轉發憑證，容器內可反向在主機執行指令）、zsh ＋ po
 
 建這套東西時撞到的問題、根因與解法，以及被否決過的方向，記在
 [`docs/agent-sandbox-kit-review.md`](docs/agent-sandbox-kit-review.md)。
+排版過、含真實指令輸出的版本在 [`docs/manual.html`](docs/manual.html)。
 
 幾個最值得先知道的：
 
